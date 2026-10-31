@@ -402,10 +402,7 @@ export function InteractiveBookshelf() {
 
       {/* Floating Interactive Beacon Indicator */}
       <InteractiveObjectBeacon
-        position={[-0.12, 0.24, 0.08]}
-        label="SKILLS SHELF"
-        note="Click shelf to view 5 skill volumes"
-        icon="📚"
+        position={[-0.12, 0.22, 0.08]}
         isHovered={isShelfHovered}
         isOpen={isBookshelfOpen}
         isAnyObjectOpen={isAnyObjectOpen}

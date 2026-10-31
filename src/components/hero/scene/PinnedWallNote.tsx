@@ -312,10 +312,7 @@ export function PinnedWallNote({
 
       {/* Floating Interactive Beacon Indicator */}
       <InteractiveObjectBeacon
-        position={[0, noteH * 0.58, 0.05]}
-        label="WALL NOTICE"
-        note="Click note to inspect room updates"
-        icon="📌"
+        position={[0, noteH * 0.54, 0.04]}
         isHovered={isHovered}
         isOpen={isWallNoteOpen}
         isAnyObjectOpen={isAnyObjectOpen}

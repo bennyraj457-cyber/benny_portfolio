@@ -875,10 +875,7 @@ export function ContactSmartphone({
 
       {/* Floating Interactive Beacon Indicator */}
       <InteractiveObjectBeacon
-        position={[0, 0.08, 0]}
-        label="CONTACT ME"
-        note="Tap phone to connect & message"
-        icon="📱"
+        position={[0, 0.05, 0]}
         isHovered={isHovered}
         isOpen={isSmartphoneOpen}
         isAnyObjectOpen={isAnyObjectOpen}

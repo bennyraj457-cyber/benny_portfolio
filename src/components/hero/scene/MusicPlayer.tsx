@@ -335,10 +335,7 @@ export function MusicPlayer({
 
       {/* Floating Interactive Beacon Indicator */}
       <InteractiveObjectBeacon
-        position={[0, 0.24, 0]}
-        label="MUSIC PLAYER"
-        note="Click player to listen & control vinyl"
-        icon="🎵"
+        position={[0, 0.22, 0]}
         isHovered={isPlayerHovered}
         isOpen={isMusicPlayerOpen}
         isAnyObjectOpen={isAnyObjectOpen}

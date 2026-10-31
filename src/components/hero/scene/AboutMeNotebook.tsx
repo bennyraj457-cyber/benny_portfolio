@@ -561,10 +561,7 @@ export function AboutMeNotebook({
 
       {/* Floating Interactive Beacon Indicator */}
       <InteractiveObjectBeacon
-        position={[0, 0.08, 0]}
-        label="ABOUT ME"
-        note="Click notebook to open & explore"
-        icon="📖"
+        position={[0, 0.05, 0]}
         isHovered={isHovered}
         isOpen={isNotebookOpen}
         isAnyObjectOpen={isAnyObjectOpen}
