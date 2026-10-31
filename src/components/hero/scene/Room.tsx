@@ -1,24 +1,36 @@
+import { useRef } from 'react'
+import * as THREE from 'three'
+import { useFrame } from '@react-three/fiber'
 import { Wall } from './Wall'
 import { Floor } from './Floor'
 import { Desk } from './Desk'
 import { Chair } from './Chair'
-// import { Character } from './Character'
 import { ComputerSetup } from './ComputerSetup'
 import { RoomDoor } from './RoomDoor'
+import { useStudioLighting } from '@/context/StudioLightingContext'
 
 export function Room() {
+  const { isNightMode } = useStudioLighting()
+  const fogRef = useRef<THREE.Fog>(null)
+  const targetFogColor = useRef(new THREE.Color('#f0eee8'))
+
+  useFrame((_, delta) => {
+    targetFogColor.current.set(isNightMode ? '#10141e' : '#f0eee8')
+    if (fogRef.current) {
+      fogRef.current.color.lerp(targetFogColor.current, delta * 4)
+    }
+  })
+
   return (
     <group name="Room">
-      {/* Subtle atmospheric depth fog matching the Stitch surface palette */}
-      <fog attach="fog" args={['#f0eee8', 5.5, 13]} />
+      {/* Dynamic atmospheric depth fog adapting to Day / Midnight Dev Mode */}
+      <fog ref={fogRef} attach="fog" args={['#f0eee8', 5.5, 13]} />
       <Floor />
       <Wall />
       <Desk />
       <ComputerSetup />
       <Chair />
       <RoomDoor />
-      {/* Character removed per user request */}
     </group>
   )
 }
-

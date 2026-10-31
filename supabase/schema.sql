@@ -1,4 +1,4 @@
--- Supabase SQL schema for Music Player Playlist
+-- Supabase SQL schema for Portfolio Workspace
 -- Run this in your Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
 
 -- 1. Create the songs table
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.songs (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. Enable Row Level Security (RLS)
+-- 2. Enable Row Level Security (RLS) for songs
 ALTER TABLE public.songs ENABLE ROW LEVEL SECURITY;
 
 -- 3. Allow anonymous public read access so visitors can listen to songs
@@ -23,14 +23,21 @@ CREATE POLICY "Allow public read access to songs"
   TO public 
   USING (true);
 
--- 4. Sample insert statement (replace src with your actual Supabase storage public URL)
--- INSERT INTO public.songs (title, artist, duration, src, cover_label, order_index)
--- VALUES (
---   'Lofi Sunset',
---   'Studio Vibes',
---   180,
---   'https://your-project.supabase.co/storage/v1/object/public/songs/sample.mp3',
---   'LO-FI / CHILL',
---   1
--- );
+-- 4. Create the wall_art table for dynamic framed art / posters
+CREATE TABLE IF NOT EXISTS public.wall_art (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL DEFAULT 'Wall Art',
+  image_url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
+-- Enable RLS for wall_art
+ALTER TABLE public.wall_art ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access to wall_art
+CREATE POLICY "Allow public read access to wall_art" 
+  ON public.wall_art 
+  FOR SELECT 
+  TO public 
+  USING (true);

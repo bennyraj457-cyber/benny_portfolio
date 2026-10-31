@@ -2,6 +2,7 @@ import { RoundedBox } from '@react-three/drei'
 import { AboutMeNotebook } from './AboutMeNotebook'
 import { ContactSmartphone } from './ContactSmartphone'
 import { MusicPlayer } from './MusicPlayer'
+import { StudioDeskLamp } from './StudioDeskLamp'
 
 export function Desk() {
   return (
@@ -101,6 +102,9 @@ export function Desk() {
 
       {/* 4. Realistic Vintage Gramophone Music Player (Right Desk Area) */}
       <MusicPlayer position={[0.62, 0.759, -0.12]} rotation={[0, -0.35, 0]} />
+
+      {/* 5. Interactive Botanical Linen Desk Lamp (Day / Night Studio Lighting Toggle) */}
+      <StudioDeskLamp position={[-0.72, 0.759, -0.22]} rotation={[0, 0.35, 0]} />
     </group>
   )
 }

@@ -14,6 +14,7 @@ export type ActiveWorkspaceObject =
   | 'music-player'
   | 'bookshelf'
   | 'wall-note'
+  | 'wall-art'
   | null
 
 export type ActiveSkillBook =
@@ -37,6 +38,8 @@ interface WorkspaceFocusContextValue {
   isMusicPlayerOpen: boolean
   /** Whether the Pinned Wall Note experience is currently focused */
   isWallNoteOpen: boolean
+  /** Whether the Framed Wall Art is currently focused */
+  isWallArtOpen: boolean
   /** Whether the Bookshelf stage is currently focused */
   isBookshelfOpen: boolean
   /** Whether an individual skill book is currently opened */
@@ -57,6 +60,7 @@ interface WorkspaceFocusContextValue {
   closeMusicPlayer: () => void
   /** Open the Pinned Wall Note experience and transition camera close up to read */
   openWallNote: () => void
+  openWallArt: () => void
   /** Close the Pinned Wall Note experience */
   closeWallNote: () => void
   /** Open the Bookshelf view and frame all 5 books */
@@ -80,6 +84,7 @@ const WorkspaceFocusContext = createContext<WorkspaceFocusContextValue>({
   isSmartphoneOpen: false,
   isMusicPlayerOpen: false,
   isWallNoteOpen: false,
+  isWallArtOpen: false,
   isBookshelfOpen: false,
   isBookOpened: false,
   isAnyObjectOpen: false,
@@ -90,6 +95,7 @@ const WorkspaceFocusContext = createContext<WorkspaceFocusContextValue>({
   openMusicPlayer: () => {},
   closeMusicPlayer: () => {},
   openWallNote: () => {},
+  openWallArt: () => {},
   closeWallNote: () => {},
   openBookshelf: () => {},
   closeBookshelf: () => {},
@@ -133,6 +139,11 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
   const openWallNote = useCallback(() => {
     setActiveBook(null)
     setActiveObject('wall-note')
+  }, [])
+
+  const openWallArt = useCallback(() => {
+    setActiveBook(null)
+    setActiveObject('wall-art')
   }, [])
 
   const closeWallNote = useCallback(() => {
@@ -194,6 +205,7 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
       isSmartphoneOpen: activeObject === 'contact-smartphone',
       isMusicPlayerOpen: activeObject === 'music-player',
       isWallNoteOpen: activeObject === 'wall-note',
+      isWallArtOpen: activeObject === 'wall-art',
       isBookshelfOpen: activeObject === 'bookshelf',
       isBookOpened: activeObject === 'bookshelf' && activeBook !== null,
       isAnyObjectOpen: activeObject !== null,
@@ -204,6 +216,7 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
       openMusicPlayer,
       closeMusicPlayer,
       openWallNote,
+      openWallArt,
       closeWallNote,
       openBookshelf,
       closeBookshelf,

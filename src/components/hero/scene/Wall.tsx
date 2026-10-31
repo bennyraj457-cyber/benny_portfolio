@@ -1,6 +1,6 @@
-import { RoundedBox } from '@react-three/drei'
 import { InteractiveBookshelf } from './InteractiveBookshelf'
 import { PinnedWallNote } from './PinnedWallNote'
+import { FramedWallArt } from './FramedWallArt'
 
 const SLAT_POSITIONS = [
   -2.4, -2.28, -2.16, -2.04, -1.92, -1.8, -1.68, -1.56, -1.44, -1.32,
@@ -53,31 +53,8 @@ export function Wall() {
         ))}
       </group>
 
-      {/* Minimalist Framed Architectural Print (Right Side of Wall) */}
-      <group position={[1.55, 1.68, -1.37]}>
-        {/* Outer Frame (#30312d inverse-surface) */}
-        <RoundedBox args={[0.56, 0.74, 0.025]} radius={0.008} smoothness={2} castShadow>
-          <meshStandardMaterial color="#30312d" roughness={0.4} metalness={0.2} />
-        </RoundedBox>
-        {/* Archival Matting (#fbf9f3) */}
-        <mesh position={[0, 0, 0.014]}>
-          <planeGeometry args={[0.5, 0.68]} />
-          <meshStandardMaterial color="#fbf9f3" roughness={0.9} />
-        </mesh>
-        {/* Minimalist Geometric Study Inside Frame */}
-        <mesh position={[0, 0.02, 0.016]}>
-          <planeGeometry args={[0.32, 0.44]} />
-          <meshStandardMaterial color="#eae8e2" roughness={0.85} />
-        </mesh>
-        <mesh position={[0, 0.02, 0.018]}>
-          <circleGeometry args={[0.09, 32]} />
-          <meshStandardMaterial color="#30312d" roughness={0.6} />
-        </mesh>
-        <mesh position={[0.05, -0.05, 0.019]}>
-          <circleGeometry args={[0.025, 24]} />
-          <meshStandardMaterial color="#f5d000" roughness={0.4} />
-        </mesh>
-      </group>
+      {/* Dynamic Framed Wall Art (Supabase Connected) */}
+      <FramedWallArt position={[1.55, 1.68, -1.37]} />
 
       {/* Floating Minimalist Wall Shelf (Top Left Above Desk) with Interactive Bookshelf */}
       <InteractiveBookshelf />
@@ -87,4 +64,3 @@ export function Wall() {
     </group>
   )
 }
-

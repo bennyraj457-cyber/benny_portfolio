@@ -4,7 +4,7 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { useRoomEntrance } from '@/context/RoomEntranceContext'
 import { entranceAudio } from '@/utils/entranceAudio'
-import { createDoorNameplateTexture } from './doorNameplateTexture'
+import { EntranceWallDecor } from './EntranceWallDecor'
 import {
   createGlassDecalTexture,
   createDoorBottomDecalTexture,
@@ -21,7 +21,6 @@ export function RoomDoor() {
   const indicatorRingRef = useRef<THREE.MeshBasicMaterial>(null)
 
   // Procedural textures
-  const nameplateTexture = useMemo(() => createDoorNameplateTexture(), [])
   const glassDecalTexture = useMemo(() => createGlassDecalTexture(), [])
   const doorBottomDecalTexture = useMemo(() => createDoorBottomDecalTexture(), [])
 
@@ -232,6 +231,9 @@ export function RoomDoor() {
         <meshStandardMaterial color="#eae8e2" roughness={0.4} />
       </mesh>
 
+      {/* Architectural Entrance Wall Decor (Sconce, Plaque, Plant) */}
+      <EntranceWallDecor />
+
       {/* 3. Swiveling Clean-Room Teal Door Assembly with Glass Window */}
       <group
         ref={doorPivotRef}
@@ -323,25 +325,6 @@ export function RoomDoor() {
             <mesh position={[-winW * 0.15, winH * 0.2, 0.003]} rotation={[0, 0, -0.6]}>
               <planeGeometry args={[0.035, 0.28]} />
               <meshBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} />
-            </mesh>
-          </group>
-
-          {/* C. Architectural Nameplate: BENNY R - UI/UX Designer & Web Designer */}
-          <group position={[0, -0.22, doorThickness / 2 + 0.003]}>
-            {/* 3D Dark Mount Backplate */}
-            <mesh position={[0, 0, 0.0005]} castShadow>
-              <boxGeometry args={[0.48, 0.16, 0.004]} />
-              <meshStandardMaterial color="#111210" metalness={0.8} roughness={0.3} />
-            </mesh>
-
-            {/* Front Printed Nameplate Face */}
-            <mesh position={[0, 0, 0.003]}>
-              <planeGeometry args={[0.48, 0.16]} />
-              <meshBasicMaterial
-                map={nameplateTexture}
-                toneMapped={false}
-                side={THREE.FrontSide}
-              />
             </mesh>
           </group>
 

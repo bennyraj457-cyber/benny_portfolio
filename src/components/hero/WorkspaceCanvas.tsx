@@ -3,6 +3,10 @@ import { Canvas } from '@react-three/fiber'
 import { Camera, Lighting, Room } from './scene'
 import { WorkspaceFocusProvider, useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
 import { RoomEntranceProvider, useRoomEntrance } from '@/context/RoomEntranceContext'
+import { StudioLightingProvider } from '@/context/StudioLightingContext'
+import { StoryScrollProvider } from '@/context/StoryScrollContext'
+import { StoryScrollHUD } from './StoryScrollHUD'
+import { StoryScrollBridge } from './StoryScrollBridge'
 import { EntranceOverlay } from './EntranceOverlay'
 
 interface ErrorBoundaryProps {
@@ -177,8 +181,10 @@ export function WorkspaceCanvas() {
 
   return (
     <SceneErrorBoundary fallback={<WorkspaceFallback />}>
-      <RoomEntranceProvider>
-        <WorkspaceFocusProvider>
+      <StudioLightingProvider>
+        <RoomEntranceProvider>
+          <WorkspaceFocusProvider>
+            <StoryScrollProvider>
           <div className="relative w-full h-full min-h-screen">
             <Suspense
               fallback={<div className="w-full h-full min-h-screen bg-surface-container-low" />}
@@ -202,9 +208,13 @@ export function WorkspaceCanvas() {
             </Suspense>
             <EntranceOverlay />
             <BackToWorkspaceControl />
+            <StoryScrollHUD />
+            <StoryScrollBridge />
           </div>
-        </WorkspaceFocusProvider>
-      </RoomEntranceProvider>
+            </StoryScrollProvider>
+          </WorkspaceFocusProvider>
+        </RoomEntranceProvider>
+      </StudioLightingProvider>
     </SceneErrorBoundary>
   )
 }
