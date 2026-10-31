@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surface & Neutral Tokens */
+    --color-surface: #fbf9f3;
+    --color-surface-dim: #dcdad4;
+    --color-surface-bright: #fbf9f3;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f5f3ee;
+    --color-surface-container: #f0eee8;
+    --color-surface-container-high: #eae8e2;
+    --color-surface-container-highest: #e4e2dd;
+    --color-surface-variant: #e4e2dd;
+    --color-surface-tint: #6f5d00;
+
+    /* On-Surface & Inverse Tokens */
+    --color-on-surface: #1b1c19;
+    --color-on-surface-variant: #4c4732;
+    --color-inverse-surface: #30312d;
+    --color-inverse-on-surface: #f2f1eb;
+
+    /* Outline Tokens */
+    --color-outline: #7e775f;
+    --color-outline-variant: #cfc6ab;
+
+    /* Primary / Aureolin Accent Tokens */
+    --color-primary: #6f5d00;
+    --color-on-primary: #ffffff;
+    --color-primary-container: #f5d000;
+    --color-on-primary-container: #6a5900;
+    --color-inverse-primary: #dec666;
+    --color-primary-fixed: #ffe167;
+    --color-primary-fixed-dim: #e7c400;
+    --color-on-primary-fixed: #221b00;
+    --color-on-primary-fixed-variant: #544600;
+
+    /* Secondary / Herbarium Forest Tokens */
+    --color-secondary: #4c6452;
+    --color-on-secondary: #ffffff;
+    --color-secondary-container: #cbe6d0;
+    --color-on-secondary-container: #506856;
+    --color-secondary-fixed: #cee9d3;
+    --color-secondary-fixed-dim: #b2cdb7;
+    --color-on-secondary-fixed: #092012;
+    --color-on-secondary-fixed-variant: #354c3b;
+
+    /* Tertiary Tokens */
+    --color-tertiary: #5a605b;
+    --color-on-tertiary: #ffffff;
+    --color-tertiary-container: #ced4cd;
+    --color-on-tertiary-container: #555c56;
+    --color-tertiary-fixed: #dee4dd;
+    --color-tertiary-fixed-dim: #c2c8c2;
+    --color-on-tertiary-fixed: #171d19;
+    --color-on-tertiary-fixed-variant: #424844;
+
+    /* Error Tokens */
+    --color-error: #ba1a1a;
+    --color-on-error: #ffffff;
+    --color-error-container: #ffdad6;
+    --color-on-error-container: #93000a;
+
+    /* Background Alias Tokens */
+    --color-background: #fbf9f3;
+    --color-on-background: #1b1c19;
+
+    /* Spacing & Layout Tokens */
+    --spacing-gutter: 1.5rem;
+    --spacing-gutter-desktop: 2.5rem;
+    --spacing-margin: 1.25rem;
+    --spacing-margin-desktop: 3.5rem;
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.75rem;
+    --spacing-xl: 3rem;
+    --spacing-2xl: 5rem;
+
+    /* Shape / Border Radius Tokens */
+    --radius-sm: 0.5rem;
+    --radius-default: 1rem;
+    --radius-md: 1.5rem;
+    --radius-lg: 2rem;
+    --radius-xl: 3rem;
+    --radius-full: 9999px;
+  }
+
+  html {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: 'Newsreader', Georgia, serif;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-size: 1rem;
+    line-height: 1.625rem;
+    letter-spacing: 0em;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  /* ==========================================================================
+   * Typography Utility Classes (Aureolin Botanica Scale)
+   * ========================================================================== */
+
+  /* Responsive Display Hero: 2.75rem on mobile, 4.5rem on desktop */
+  .text-editorial-hero {
+    @apply font-serif text-display-hero-mobile lg:text-display-hero;
+  }
+
+  /* Responsive Headline Large: 2rem on mobile, 3rem on desktop */
+  .text-editorial-h1 {
+    @apply font-serif text-headline-lg-mobile lg:text-headline-lg;
+  }
+
+  .text-editorial-h2 {
+    @apply font-serif text-headline-md;
+  }
+
+  .text-editorial-h3 {
+    @apply font-serif text-headline-sm;
+  }
+
+  .text-editorial-body-lg {
+    @apply font-serif text-body-lg;
+  }
+
+  .text-editorial-body {
+    @apply font-serif text-body-md;
+  }
+
+  .text-editorial-body-sm {
+    @apply font-serif text-body-sm;
+  }
+
+  /* Technical Monospace Utilities */
+  .text-telemetry-caps {
+    @apply font-mono text-label-caps uppercase;
+  }
+
+  .text-telemetry-catalog {
+    @apply font-mono text-code-catalog;
+  }
+
+  .text-telemetry-metric {
+    @apply font-mono text-label-metric;
+  }
+
+  /* ==========================================================================
+   * Responsive Layout Foundations (Museum Plate Matting & 12-Col Grid)
+   * ========================================================================== */
+
+  /* Outer canvas container with Stitch lateral margins */
+  .layout-canvas {
+    @apply w-full max-w-[1440px] mx-auto px-margin lg:px-margin-desktop;
+  }
+
+  /* Responsive 1 -> 2 -> 12 column architectural grid */
+  .layout-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-gutter lg:gap-gutter-desktop;
+  }
+
+  /* Standard vertical section spacing */
+  .layout-section {
+    @apply py-space-lg lg:py-space-2xl;
+  }
+
+  /* ==========================================================================
+   * Stitch Component & Surface Recipes
+   * ========================================================================== */
+
+  /* Primary Action Button: Pill-shaped, #f5d000 container, #6a5900 label-caps, hover #ffe167 + accent halo */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-space-sm rounded-full bg-primary-container px-space-lg py-3 font-mono text-label-caps uppercase text-on-primary-container transition-all duration-200 hover:bg-primary-fixed hover:shadow-[0_0_0_2px_#FAF8F2,0_0_0_4px_#F5D000] active:scale-[0.99];
+  }
+
+  /* Secondary Action Button: Pill-shaped in surface-container with subtle elevation and dark text */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-space-sm rounded-full bg-surface-container px-space-lg py-3 font-mono text-label-caps uppercase text-on-surface shadow-sm border border-outline-variant/40 transition-all duration-200 hover:bg-surface-container-high active:scale-[0.99];
+  }
+
+  /* Specimen Tags & Chips */
+  .chip-specimen {
+    @apply inline-flex items-center gap-space-sm rounded-full bg-surface-container px-3.5 py-1.5 font-mono text-label-caps uppercase text-on-surface-variant border border-outline-variant/50;
+  }
+
+  .chip-botanical {
+    @apply inline-flex items-center gap-space-sm rounded-full bg-secondary-container px-3.5 py-1.5 font-mono text-label-caps uppercase text-on-secondary-container;
+  }
+
+  /* Pulsating status dot for specimen tags */
+  .status-dot-pulse {
+    @apply w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse;
+  }
+
+  /* Cards & Specimen Plates */
+  .specimen-plate {
+    @apply rounded-lg bg-surface-container-low border border-outline-variant/40 shadow-sm;
+  }
+
+  .specimen-plate-lowest {
+    @apply rounded-lg bg-surface-container-lowest border border-outline-variant/40 shadow-sm;
+  }
+
+  /* Inverted Dark Sheet for spectral charts & technical data screens */
+  .specimen-plate-inverse {
+    @apply rounded-lg bg-inverse-surface text-inverse-on-surface shadow-md;
+  }
+
+  /* Glassmorphism floating ribbon */
+  .glass-ribbon {
+    @apply bg-surface/90 backdrop-blur-md border border-outline-variant/40;
+  }
+
+  /* Telemetry Data Strip */
+  .telemetry-strip {
+    @apply flex flex-wrap items-center gap-space-md rounded-full bg-surface-container-low px-space-md py-space-sm font-mono text-label-metric text-on-surface-variant border border-outline-variant/40;
+  }
+}
+
