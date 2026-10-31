@@ -16,7 +16,7 @@ function TallHousePlantModel() {
     clonedScene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        mesh.castShadow = true
+        mesh.castShadow = false
         mesh.receiveShadow = true
 
         if (mesh.material) {
@@ -80,7 +80,6 @@ function AcousticWoodSlats({
           <mesh
             key={`wood-slat-${i}`}
             position={[xOffset, 0, 0.003 + slatDepth / 2]}
-            castShadow
             receiveShadow
           >
             <boxGeometry args={[slatWidth, height, slatDepth]} />

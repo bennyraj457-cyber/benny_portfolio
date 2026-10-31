@@ -2,8 +2,8 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const CANVAS_W = 2100
-const CANVAS_H = 850
+const CANVAS_W = 1400
+const CANVAS_H = 566
 const HALF_W = CANVAS_W / 2 // 1050
 
 const TYPED_SNIPPETS = [
@@ -912,7 +912,7 @@ export function MonitorScreenSurface() {
   useFrame(({ clock }) => {
     if (!ctx) return
     const t = clock.getElapsedTime()
-    if (t - lastDrawRef.current < 0.08) return
+    if (t - lastDrawRef.current < 0.16) return
     lastDrawRef.current = t
 
     drawSplitWorkspace(ctx, t)

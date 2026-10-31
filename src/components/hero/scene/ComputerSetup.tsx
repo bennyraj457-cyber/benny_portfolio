@@ -128,7 +128,7 @@ export function ComputerSetup() {
                     : '#fbf9f3'
 
               return (
-                <mesh key={`${rIdx}-${cIdx}`} position={[x, 0, z]} castShadow>
+                <mesh key={`${rIdx}-${cIdx}`} position={[x, 0, z]}>
                   <boxGeometry args={[0.019, 0.007, 0.016]} />
                   <meshStandardMaterial color={color} roughness={0.5} />
                 </mesh>

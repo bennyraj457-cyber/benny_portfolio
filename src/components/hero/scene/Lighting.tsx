@@ -78,7 +78,7 @@ export function Lighting() {
         intensity={1.35}
         color="#fbf9f3"
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
         shadow-bias={-0.0004}
         shadow-camera-near={0.5}
         shadow-camera-far={10}
@@ -112,9 +112,11 @@ export function Lighting() {
       <ContactShadows
         position={[0, 0.001, 0]}
         opacity={isNightMode ? 0.35 : 0.6}
-        scale={10}
-        blur={2.2}
-        far={3.5}
+        scale={8}
+        blur={1.8}
+        far={2.5}
+        resolution={512}
+        frames={1}
         color="#15171a"
       />
     </group>

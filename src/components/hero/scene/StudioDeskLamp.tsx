@@ -218,8 +218,7 @@ export function StudioDeskLamp({
           penumbra={0.75}
           distance={2.4}
           decay={2}
-          castShadow
-          shadow-bias={-0.001}
+          
         />
       </group>
 
