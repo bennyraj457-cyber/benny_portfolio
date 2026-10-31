@@ -1,5 +1,5 @@
-import { Component, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Component, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { Camera, Lighting, Room } from './scene'
 import { WorkspaceFocusProvider, useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
 import { RoomEntranceProvider, useRoomEntrance } from '@/context/RoomEntranceContext'
@@ -130,7 +130,7 @@ function BackToWorkspaceControl() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-8 z-30 flex flex-col items-center gap-3">
+      <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex flex-col items-center gap-3">
         {/* Small Instruction Banner when Bookshelf is open but no book is selected */}
         {isBookshelfOpen && !isBookOpened && (
           <div className="pointer-events-none rounded-full border border-[#f5d000]/40 bg-[#181917]/90 px-4 py-1.5 text-[11px] font-mono tracking-widest text-[#f5d000] uppercase shadow-md backdrop-blur-md animate-pulse">
@@ -168,11 +168,53 @@ function BackToWorkspaceControl() {
   )
 }
 
+/**
+ * Dismisses the initial HTML studio loader only after the 3D scene has actually
+ * rendered several frames to the GPU, eliminating any white/blank screen flash.
+ */
+function SceneReadyNotifier() {
+  const frameCountRef = useRef(0)
+  const dismissedRef = useRef(false)
+
+  useFrame(() => {
+    if (dismissedRef.current) return
+    frameCountRef.current += 1
+
+    if (frameCountRef.current >= 4) {
+      dismissedRef.current = true
+      const win = window as unknown as { __loaderInterval?: number }
+      if (win.__loaderInterval) {
+        clearInterval(win.__loaderInterval)
+      }
+      const fill = document.getElementById('initial-loader-fill')
+      const pctEl = document.getElementById('initial-loader-pct')
+      const txtEl = document.getElementById('initial-loader-text')
+      if (fill) fill.style.width = '100%'
+      if (pctEl) pctEl.textContent = '100%'
+      if (txtEl) txtEl.textContent = 'Studio Ready'
+
+      setTimeout(() => {
+        const loader = document.getElementById('initial-loader')
+        if (loader) {
+          loader.classList.add('loader-hidden')
+          setTimeout(() => loader.remove(), 750)
+        }
+      }, 220)
+    }
+  })
+
+  return null
+}
+
 export function WorkspaceCanvas() {
   const [webglSupported, setWebglSupported] = useState<boolean>(true)
 
   useEffect(() => {
-    setWebglSupported(checkWebGLSupport())
+    const supported = checkWebGLSupport()
+    setWebglSupported(supported)
+    if (!supported) {
+      document.getElementById('initial-loader')?.classList.add('loader-hidden')
+    }
   }, [])
 
   if (!webglSupported) {
@@ -185,9 +227,9 @@ export function WorkspaceCanvas() {
         <RoomEntranceProvider>
           <WorkspaceFocusProvider>
             <StoryScrollProvider>
-          <div className="relative w-full h-full min-h-screen">
+          <div className="relative w-full h-full min-h-screen bg-[#f0eee8]">
             <Suspense
-              fallback={<div className="w-full h-full min-h-screen bg-surface-container-low" />}
+              fallback={<div className="w-full h-full min-h-screen bg-[#181917]" />}
             >
               <Canvas
                 shadows
@@ -204,6 +246,7 @@ export function WorkspaceCanvas() {
                 <Camera />
                 <Lighting />
                 <Room />
+                <SceneReadyNotifier />
               </Canvas>
             </Suspense>
             <EntranceOverlay />

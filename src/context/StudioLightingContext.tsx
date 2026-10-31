@@ -9,11 +9,8 @@ interface StudioLightingContextType {
 const StudioLightingContext = createContext<StudioLightingContextType | null>(null)
 
 export function StudioLightingProvider({ children }: { children: ReactNode }) {
-  // Check local time: if late evening (after 7 PM or before 6 AM), default to cozy night mode, else day
-  const [isNightMode, setIsNightMode] = useState<boolean>(() => {
-    const hour = new Date().getHours()
-    return hour >= 19 || hour < 6
-  })
+  // Always start in bright daytime studio lighting on load
+  const [isNightMode, setIsNightMode] = useState<boolean>(false)
 
   const toggleDayNight = () => {
     setIsNightMode((prev) => !prev)

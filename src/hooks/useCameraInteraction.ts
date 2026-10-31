@@ -93,44 +93,11 @@ export function useCameraInteraction() {
       stateRef.current.pointerY = 0
     }
 
-    // 4. Scroll & wheel progress (0 -> 1) for smooth Hero camera transition
-    // Works both when scrolling through a multi-section page AND via wheel scrub on the Hero
-    let virtualScroll = 0
-
-    const updatePageScroll = () => {
-      const vh = Math.max(1, window.innerHeight)
-      const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh)
-      if (maxScroll > 10) {
-        const pageProgress = THREE.MathUtils.clamp(window.scrollY / vh, 0, 1)
-        stateRef.current.scrollProgress = pageProgress
-        virtualScroll = pageProgress
-      }
-    }
-
-    const handleWheel = (e: WheelEvent) => {
-      if (stateRef.current.reducedMotion) return
-      const vh = Math.max(1, window.innerHeight)
-      const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh)
-      if (maxScroll <= 10) {
-        // When only the Hero section is present, allow subtle wheel-driven camera dolly transition
-        virtualScroll = THREE.MathUtils.clamp(
-          virtualScroll + e.deltaY * 0.0006,
-          0,
-          1,
-        )
-        stateRef.current.scrollProgress = virtualScroll
-      }
-    }
-
-    updatePageScroll()
-
     window.addEventListener('pointermove', handlePointerMove, { passive: true })
     window.addEventListener('pointerleave', handlePointerLeave, { passive: true })
     window.addEventListener('touchstart', handleTouchStart, { passive: true })
     window.addEventListener('touchmove', handleTouchMove, { passive: true })
     window.addEventListener('touchend', handleTouchEnd, { passive: true })
-    window.addEventListener('scroll', updatePageScroll, { passive: true })
-    window.addEventListener('wheel', handleWheel, { passive: true })
 
     return () => {
       motionQuery.removeEventListener('change', handleMotionChange)
@@ -139,8 +106,6 @@ export function useCameraInteraction() {
       window.removeEventListener('touchstart', handleTouchStart)
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', handleTouchEnd)
-      window.removeEventListener('scroll', updatePageScroll)
-      window.removeEventListener('wheel', handleWheel)
     }
   }, [])
 

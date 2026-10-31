@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useMusicPlayer } from '@/hooks/useMusicPlayer'
 import { useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
 import { InteractiveObjectBeacon } from './InteractiveObjectBeacon'
+import { MusicAtmosphere } from './MusicAtmosphere'
 
 /**
  * Procedural dial display texture renderer matching the reference image's
@@ -790,6 +791,17 @@ export function MusicPlayer({
           </mesh>
         </group>
       </group>
+
+      {/* ========================================================= */}
+      {/* 5. FLOATING SYNCED LYRICS & MUSIC NOTE PARTICLES          */}
+      {/* ========================================================= */}
+      <MusicAtmosphere
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        trackTitle={currentTrack.title}
+        artist={currentTrack.artist}
+        isMusicPlayerOpen={isMusicPlayerOpen}
+      />
     </group>
   )
 }

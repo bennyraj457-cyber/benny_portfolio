@@ -6,6 +6,7 @@ export type StoryStepId =
   | 'music-player'
   | 'smartphone'
   | 'wall-art'
+  | 'wall-note'
 
 export interface StoryStep {
   id: StoryStepId
@@ -23,7 +24,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Studio Entrance',
     subtitle: 'Private Lab & Workspace 01',
     category: 'STUDIO ENTRANCE',
-    hint: 'Scroll down to enter the room',
+    hint: 'Click Next or the door handle to enter the room',
   },
   {
     id: 'room-overview',
@@ -31,7 +32,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Creative Studio',
     subtitle: '3D Workspace & Design Lab',
     category: 'OVERVIEW',
-    hint: 'Scroll to explore interactive tools',
+    hint: 'Click Next to tour each station or click any object',
   },
   {
     id: 'notebook',
@@ -39,7 +40,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'About Me Notebook',
     subtitle: 'Creative Developer & UI/UX Designer',
     category: 'BIOGRAPHY & PHILOSOPHY',
-    hint: 'Flip pages or scroll to continue',
+    hint: 'Flip pages or click Next to continue',
   },
   {
     id: 'bookshelf',
@@ -47,7 +48,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Skills & Tech Stack',
     subtitle: 'React • Three.js • TypeScript • UI/UX',
     category: 'KNOWLEDGE & CAPABILITIES',
-    hint: 'Click books or scroll to next station',
+    hint: 'Click any book to read or click Next',
   },
   {
     id: 'music-player',
@@ -55,7 +56,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Vintage Gramophone',
     subtitle: 'Soundtrack & Ambient Audio',
     category: 'AUDIO & AMBIENCE',
-    hint: 'Play songs or scroll to contact',
+    hint: 'Play songs or click Next to continue',
   },
   {
     id: 'smartphone',
@@ -63,7 +64,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: "Let's Connect",
     subtitle: 'Direct Messaging & Social Links',
     category: 'COMMUNICATION',
-    hint: 'Send a message or scroll to gallery',
+    hint: 'Send a message or click Next to continue',
   },
   {
     id: 'wall-art',
@@ -71,7 +72,15 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Framed Gallery Art',
     subtitle: 'Live Artwork from Supabase',
     category: 'EXHIBITION',
-    hint: 'Scroll up to revisit previous stations',
+    hint: 'Click Next to view notice or Prev to go back',
+  },
+  {
+    id: 'wall-note',
+    stepNumber: 8,
+    title: 'Studio Notice',
+    subtitle: 'Workspace Expansion & Updates',
+    category: 'NOTICE BOARD',
+    hint: 'Click Next to restart tour or Prev to go back',
   },
 ]
 
