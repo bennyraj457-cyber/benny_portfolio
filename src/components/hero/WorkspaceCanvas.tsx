@@ -8,6 +8,7 @@ import { StoryScrollProvider } from '@/context/StoryScrollContext'
 import { StoryScrollHUD } from './StoryScrollHUD'
 import { StoryScrollBridge } from './StoryScrollBridge'
 import { EntranceOverlay } from './EntranceOverlay'
+import { StudioLoader } from '@/components/ui/StudioLoader'
 
 interface ErrorBoundaryProps {
   fallback: ReactNode
@@ -84,14 +85,9 @@ export function WorkspaceFallback() {
   )
 }
 
-function BackToWorkspaceControl() {
+function BackToWorkspaceControl({ onBackToHome }: { onBackToHome?: () => void }) {
   const { isAnyObjectOpen, returnToWorkspace } = useWorkspaceFocus()
   const { stage, exitToDoor } = useRoomEntrance()
-
-  // Don't show workspace controls while still in entrance sequence
-  if (stage !== 'WORKSPACE') {
-    return null
-  }
 
   const handleExitClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -99,10 +95,32 @@ function BackToWorkspaceControl() {
     exitToDoor()
   }
 
+  const handleHomeClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onBackToHome) {
+      onBackToHome()
+    }
+  }
+
   return (
     <>
+      {/* Top Left Home Button */}
+      {onBackToHome && (
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 animate-fade-in pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)]">
+          <button
+            type="button"
+            onClick={handleHomeClick}
+            className="group inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-black/10 bg-white/80 hover:bg-white px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-mono tracking-wider text-[#181917] shadow-sm backdrop-blur-md transition-all duration-300 hover:border-[#f5d000] hover:scale-105 active:scale-95 touch-manipulation"
+            title="Return to Home Landing Page"
+          >
+            <span className="text-xs sm:text-sm transition-transform group-hover:-translate-x-0.5">←</span>
+            <span className="font-semibold uppercase">HOME</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Right Exit to Door Button when in normal Workspace */}
-      {!isAnyObjectOpen && (
+      {stage === 'WORKSPACE' && !isAnyObjectOpen && (
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 animate-fade-in pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)]">
           <button
             type="button"
@@ -120,51 +138,39 @@ function BackToWorkspaceControl() {
 }
 
 /**
- * Dismisses the initial HTML studio loader only after the 3D scene has actually
- * rendered several frames to the GPU, eliminating any white/blank screen flash.
+ * Signals when the 3D scene has rendered its first frames on the GPU.
  */
-function SceneReadyNotifier() {
+function SceneReadyNotifier({ onReady }: { onReady: () => void }) {
   const frameCountRef = useRef(0)
-  const dismissedRef = useRef(false)
+  const signaledRef = useRef(false)
 
   useFrame(() => {
-    if (dismissedRef.current) return
+    if (signaledRef.current) return
     frameCountRef.current += 1
 
-    if (frameCountRef.current >= 2) {
-      dismissedRef.current = true
-      const win = window as unknown as { __loaderInterval?: number }
-      if (win.__loaderInterval) {
-        clearInterval(win.__loaderInterval)
-      }
-      const fill = document.getElementById('initial-loader-fill')
-      const pctEl = document.getElementById('initial-loader-pct')
-      const txtEl = document.getElementById('initial-loader-text')
-      if (fill) fill.style.width = '100%'
-      if (pctEl) pctEl.textContent = '100%'
-      if (txtEl) txtEl.textContent = 'Studio Ready'
-
-      setTimeout(() => {
-        const loader = document.getElementById('initial-loader')
-        if (loader) {
-          loader.classList.add('loader-hidden')
-          setTimeout(() => loader.remove(), 450)
-        }
-      }, 100)
+    if (frameCountRef.current >= 3) {
+      signaledRef.current = true
+      onReady()
     }
   })
 
   return null
 }
 
-export function WorkspaceCanvas() {
+interface WorkspaceCanvasProps {
+  onBackToHome?: () => void
+}
+
+export function WorkspaceCanvas({ onBackToHome }: WorkspaceCanvasProps) {
   const [webglSupported, setWebglSupported] = useState<boolean>(true)
+  const [isSceneReady, setIsSceneReady] = useState<boolean>(false)
+  const [showLoader, setShowLoader] = useState<boolean>(true)
 
   useEffect(() => {
     const supported = checkWebGLSupport()
     setWebglSupported(supported)
     if (!supported) {
-      document.getElementById('initial-loader')?.classList.add('loader-hidden')
+      setShowLoader(false)
     }
   }, [])
 
@@ -179,6 +185,14 @@ export function WorkspaceCanvas() {
           <WorkspaceFocusProvider>
             <StoryScrollProvider>
           <div className="relative w-full h-full min-h-screen bg-[#f0eee8]">
+            {/* The Loader is now presented here after Enter Studio is clicked */}
+            {showLoader && (
+              <StudioLoader
+                isReady={isSceneReady}
+                onComplete={() => setShowLoader(false)}
+              />
+            )}
+
             <Suspense
               fallback={<div className="w-full h-full min-h-screen bg-[#181917]" />}
             >
@@ -197,11 +211,11 @@ export function WorkspaceCanvas() {
                 <Camera />
                 <Lighting />
                 <Room />
-                <SceneReadyNotifier />
+                <SceneReadyNotifier onReady={() => setIsSceneReady(true)} />
               </Canvas>
             </Suspense>
             <EntranceOverlay />
-            <BackToWorkspaceControl />
+            <BackToWorkspaceControl onBackToHome={onBackToHome} />
             <StoryScrollHUD />
             <StoryScrollBridge />
           </div>
