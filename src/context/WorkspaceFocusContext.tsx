@@ -15,6 +15,7 @@ export type ActiveWorkspaceObject =
   | 'bookshelf'
   | 'wall-note'
   | 'wall-art'
+  | 'bike-showroom'
   | null
 
 export type ActiveSkillBook =
@@ -40,6 +41,8 @@ interface WorkspaceFocusContextValue {
   isWallNoteOpen: boolean
   /** Whether the Framed Wall Art is currently focused */
   isWallArtOpen: boolean
+  /** Whether the Honda CB750 Bike Showroom & Glass Door area is currently focused */
+  isBikeShowroomOpen: boolean
   /** Whether the Bookshelf stage is currently focused */
   isBookshelfOpen: boolean
   /** Whether an individual skill book is currently opened */
@@ -61,6 +64,8 @@ interface WorkspaceFocusContextValue {
   /** Open the Pinned Wall Note experience and transition camera close up to read */
   openWallNote: () => void
   openWallArt: () => void
+  /** Open the Honda CB750 Bike Showroom & Glass Door view */
+  openBikeShowroom: () => void
   /** Close the Pinned Wall Note experience */
   closeWallNote: () => void
   /** Open the Bookshelf view and frame all 5 books */
@@ -85,6 +90,7 @@ const WorkspaceFocusContext = createContext<WorkspaceFocusContextValue>({
   isMusicPlayerOpen: false,
   isWallNoteOpen: false,
   isWallArtOpen: false,
+  isBikeShowroomOpen: false,
   isBookshelfOpen: false,
   isBookOpened: false,
   isAnyObjectOpen: false,
@@ -96,6 +102,7 @@ const WorkspaceFocusContext = createContext<WorkspaceFocusContextValue>({
   closeMusicPlayer: () => {},
   openWallNote: () => {},
   openWallArt: () => {},
+  openBikeShowroom: () => {},
   closeWallNote: () => {},
   openBookshelf: () => {},
   closeBookshelf: () => {},
@@ -144,6 +151,11 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
   const openWallArt = useCallback(() => {
     setActiveBook(null)
     setActiveObject('wall-art')
+  }, [])
+
+  const openBikeShowroom = useCallback(() => {
+    setActiveBook(null)
+    setActiveObject('bike-showroom')
   }, [])
 
   const closeWallNote = useCallback(() => {
@@ -206,6 +218,7 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
       isMusicPlayerOpen: activeObject === 'music-player',
       isWallNoteOpen: activeObject === 'wall-note',
       isWallArtOpen: activeObject === 'wall-art',
+      isBikeShowroomOpen: activeObject === 'bike-showroom',
       isBookshelfOpen: activeObject === 'bookshelf',
       isBookOpened: activeObject === 'bookshelf' && activeBook !== null,
       isAnyObjectOpen: activeObject !== null,
@@ -217,6 +230,7 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
       closeMusicPlayer,
       openWallNote,
       openWallArt,
+      openBikeShowroom,
       closeWallNote,
       openBookshelf,
       closeBookshelf,
@@ -235,6 +249,8 @@ export function WorkspaceFocusProvider({ children }: { children: ReactNode }) {
       openMusicPlayer,
       closeMusicPlayer,
       openWallNote,
+      openWallArt,
+      openBikeShowroom,
       closeWallNote,
       openBookshelf,
       closeBookshelf,

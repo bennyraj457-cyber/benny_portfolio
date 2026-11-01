@@ -82,6 +82,29 @@ export const BASIC_THUGANOMICS_LYRICS: LyricLine[] = [
   { time: 173.0, text: '♪ [Outro Beat — Word Life] ♪' },
 ]
 
+export const LOVE_AGAIN_LYRICS: LyricLine[] = [
+  { time: 0.0, text: '♪ Love Again ♪' },
+  { time: 40.0, text: 'I never thought' },
+  { time: 41.0, text: 'That I would find a way out' },
+  { time: 45.0, text: 'I never thought' },
+  { time: 46.20, text: "I'd hear my heart beat so loud" },
+  { time: 50.0, text: "I can't believe" },
+  { time: 51.0, text: "there's something" },
+  { time: 52.0, text: 'left in my chest anymore' },
+  { time: 55.0, text: 'But goddamn' },
+  { time: 57.0, text: 'you got me in love again' },
+  { time: 60.0, text: 'I used to think' },
+  { time: 61.0, text: 'that I was made out of stone' },
+  { time: 64.5, text: 'I used to spend' },
+  { time: 66.0, text: 'so many nights on my own' },
+  { time: 69.50, text: 'I never knew' },
+  { time: 71.50, text: 'I had it in me' },
+  { time: 73.0, text: 'to dance anymore' },
+  { time: 75.0, text: 'But goddamn' },
+  { time: 76.2, text: 'you got me in love again' },
+  
+]
+
 export const DEFAULT_INSTRUMENTAL_LYRICS: LyricLine[] = [
   { time: 0.0, text: '♪ Warm vinyl crackle & studio acoustics ♪' },
   { time: 2.5, text: '♪ Drifting melodies floating through the workspace ♪' },
@@ -119,6 +142,13 @@ export function parseLrcLyrics(lrc: string): LyricLine[] {
  */
 export function getBuiltInLyricsForTrack(title: string, artist: string): LyricLine[] {
   const normalized = `${title} ${artist}`.toLowerCase()
+  if (
+    normalized.includes('love again') ||
+    normalized.includes('dua lipa') ||
+    normalized.includes('dua')
+  ) {
+    return LOVE_AGAIN_LYRICS
+  }
   if (
     normalized.includes('thug') ||
     normalized.includes('cena') ||

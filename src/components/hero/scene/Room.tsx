@@ -7,6 +7,7 @@ import { Desk } from './Desk'
 import { Chair } from './Chair'
 import { ComputerSetup } from './ComputerSetup'
 import { RoomDoor } from './RoomDoor'
+import { LeftGlassDoorAndBike } from './LeftGlassDoorAndBike'
 import { useStudioLighting } from '@/context/StudioLightingContext'
 
 export function Room() {
@@ -27,6 +28,7 @@ export function Room() {
       <fog ref={fogRef} attach="fog" args={['#f0eee8', 5.5, 13]} />
       <Floor />
       <Wall />
+      <LeftGlassDoorAndBike />
       <Desk />
       <ComputerSetup />
       <Chair />

@@ -69,7 +69,7 @@ export function StudioDeskLamp({
   // Smooth light intensity and lampshade glow interpolation
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime()
-    const targetLampGlow = isNightMode ? 1.0 : 0.05
+    const targetLampGlow = isNightMode ? 1.0 : 0.0
     const targetSpotIntensity = isNightMode ? 3.4 : 0.0
     const targetBulbIntensity = isNightMode ? 1.6 : 0.0
 
@@ -101,7 +101,7 @@ export function StudioDeskLamp({
     }
 
     // Interactive electric yellow indicator pulsing halo
-    if (indicatorRingRef.current) {
+    if (indicatorRingRef.current && isClickable) {
       const pulse = 0.4 + Math.sin(t * 3.5) * 0.35
       indicatorRingRef.current.opacity = isHovered ? 0.95 : pulse
     }

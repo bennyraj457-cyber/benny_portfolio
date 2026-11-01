@@ -55,11 +55,10 @@ export function FramedWallArt({
   )
 
   useFrame((state) => {
-    if (indicatorRingRef.current) {
-      const t = state.clock.getElapsedTime()
-      const pulse = 0.45 + Math.sin(t * 3.5) * 0.35
-      indicatorRingRef.current.opacity = isHovered ? 0.95 : pulse
-    }
+    if (!indicatorRingRef.current || !isClickable) return
+    const t = state.clock.getElapsedTime()
+    const pulse = 0.45 + Math.sin(t * 3.5) * 0.35
+    indicatorRingRef.current.opacity = isHovered ? 0.95 : pulse
   })
 
   useEffect(() => {

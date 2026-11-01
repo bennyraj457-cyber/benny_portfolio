@@ -260,6 +260,7 @@ export function SkillBook({ spec, pageEdgeTexture, onSelect }: SkillBookProps) {
   // Smoothly animate individual book sliding forward slightly from the shelf on hover
   useFrame((_, delta) => {
     const target = isHovered && activeObject === null ? 1 : 0
+    if (target === 0 && hoverProgressRef.current < 0.001) return
     const factor = 1 - Math.exp(-12 * Math.min(delta, 0.1))
     hoverProgressRef.current += (target - hoverProgressRef.current) * factor
     const p = hoverProgressRef.current

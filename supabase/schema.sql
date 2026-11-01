@@ -41,3 +41,11 @@ CREATE POLICY "Allow public read access to wall_art"
   FOR SELECT 
   TO public 
   USING (true);
+
+-- 5. Allow public read access to the 'Songs' Storage Bucket so uploaded MP3s can be listed and streamed automatically
+CREATE POLICY "Allow public read access to Songs storage bucket"
+  ON storage.objects
+  FOR SELECT
+  TO public
+  USING (bucket_id IN ('Songs', 'songs'));
+

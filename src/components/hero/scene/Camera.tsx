@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -9,7 +9,7 @@ import { updateAudioListener } from '@/hooks/useMusicPlayer'
 
 // Strict spatial safety bounds so the camera never clips walls, floor, or furniture
 const BOUNDS = {
-  minAzimuth: -0.26, // ~ -15 deg max horizontal arc
+  minAzimuth: -0.34, // ~ -19.5 deg horizontal arc to comfortably see left bike showroom
   maxAzimuth: 0.26, // ~ +15 deg max horizontal arc
   minY: 1.42, // Safely above chair & desk plane
   maxY: 2.15, // Safely below ceiling
@@ -19,64 +19,92 @@ const BOUNDS = {
 
 // 0. Entrance Door Coordinates:
 const ENTRANCE_CAMERA_DESKTOP_POS = new THREE.Vector3(0, 1.45, 5.25)
-const ENTRANCE_CAMERA_MOBILE_POS = new THREE.Vector3(0, 1.45, 5.65)
+const ENTRANCE_CAMERA_MOBILE_POS = new THREE.Vector3(0, 1.50, 5.95)
 const ENTRANCE_LOOK_AT = new THREE.Vector3(0, 1.35, 3.65)
 
 // 1. Notebook world coordinates:
 const NOTEBOOK_CAMERA_DESKTOP_POS = new THREE.Vector3(-0.755, 1.18, -0.58)
-const NOTEBOOK_CAMERA_MOBILE_POS = new THREE.Vector3(-0.755, 1.32, -0.53)
+const NOTEBOOK_CAMERA_MOBILE_POS = new THREE.Vector3(-0.755, 1.40, -0.48)
 const NOTEBOOK_LOOK_AT = new THREE.Vector3(-0.755, 0.768, -0.795)
 const NOTEBOOK_UP = new THREE.Vector3(0, 0.85, -0.52).normalize()
 
 // 2. Smartphone world coordinates:
 const SMARTPHONE_CAMERA_DESKTOP_POS = new THREE.Vector3(0.56, 1.015, -0.565)
-const SMARTPHONE_CAMERA_MOBILE_POS = new THREE.Vector3(0.56, 1.075, -0.545)
+const SMARTPHONE_CAMERA_MOBILE_POS = new THREE.Vector3(0.56, 1.14, -0.52)
 const SMARTPHONE_LOOK_AT = new THREE.Vector3(0.56, 0.768, -0.675)
 const SMARTPHONE_UP = new THREE.Vector3(0, 0.88, -0.47).normalize()
 
 // 3. Music Player world coordinates:
 const MUSIC_PLAYER_CAMERA_DESKTOP_POS = new THREE.Vector3(0.55, 1.12, -0.42)
-const MUSIC_PLAYER_CAMERA_MOBILE_POS = new THREE.Vector3(0.55, 1.18, -0.38)
+const MUSIC_PLAYER_CAMERA_MOBILE_POS = new THREE.Vector3(0.55, 1.24, -0.35)
 const MUSIC_PLAYER_LOOK_AT = new THREE.Vector3(0.62, 0.90, -1.02)
 const MUSIC_PLAYER_UP = new THREE.Vector3(0, 0.92, -0.39).normalize()
 
 // 4. Bookshelf & Skill Books world coordinates:
 const BOOKSHELF_CAMERA_DESKTOP_POS = new THREE.Vector3(-0.91, 1.85, -0.65)
-const BOOKSHELF_CAMERA_MOBILE_POS = new THREE.Vector3(-0.91, 1.85, -0.52)
+const BOOKSHELF_CAMERA_MOBILE_POS = new THREE.Vector3(-0.91, 1.85, -0.42)
 const BOOKSHELF_LOOK_AT = new THREE.Vector3(-0.91, 1.845, -1.3)
 const BOOKSHELF_UP = new THREE.Vector3(0, 1, 0)
 
 // 5. Pinned Wall Note world coordinates:
 const WALL_NOTE_CAMERA_DESKTOP_POS = new THREE.Vector3(0.78, 1.84, -0.92)
-const WALL_NOTE_CAMERA_MOBILE_POS = new THREE.Vector3(0.78, 1.84, -0.82)
+const WALL_NOTE_CAMERA_MOBILE_POS = new THREE.Vector3(0.78, 1.84, -0.72)
 const WALL_NOTE_LOOK_AT = new THREE.Vector3(0.78, 1.84, -1.37)
 const WALL_NOTE_UP = new THREE.Vector3(0, 1, 0)
 
 // 6. Framed Wall Art world coordinates:
 const WALL_ART_CAMERA_DESKTOP_POS = new THREE.Vector3(1.55, 1.68, -0.72)
-const WALL_ART_CAMERA_MOBILE_POS = new THREE.Vector3(1.55, 1.68, -0.58)
+const WALL_ART_CAMERA_MOBILE_POS = new THREE.Vector3(1.55, 1.68, -0.48)
 const WALL_ART_LOOK_AT = new THREE.Vector3(1.55, 1.68, -1.37)
 const WALL_ART_UP = new THREE.Vector3(0, 1, 0)
 
+// 7. Honda CB750 Bike Showroom & Left Glass Patio Door world coordinates:
+const BIKE_SHOWROOM_CAMERA_DESKTOP_POS = new THREE.Vector3(-0.35, 1.38, 1.15)
+const BIKE_SHOWROOM_CAMERA_MOBILE_POS = new THREE.Vector3(0.12, 1.52, 1.85)
+const BIKE_SHOWROOM_LOOK_AT = new THREE.Vector3(-2.35, 0.92, -0.15)
+const BIKE_SHOWROOM_UP = new THREE.Vector3(0, 1, 0)
+
 // Individual Book Stage 2 Close-Up framing:
 const BOOK_OPEN_CAMERA_DESKTOP_POS = new THREE.Vector3(-0.90, 1.94, -0.62)
-const BOOK_OPEN_CAMERA_MOBILE_POS = new THREE.Vector3(-0.90, 1.96, -0.52)
+const BOOK_OPEN_CAMERA_MOBILE_POS = new THREE.Vector3(-0.90, 1.96, -0.42)
 const BOOK_OPEN_LOOK_AT = new THREE.Vector3(-0.90, 1.83, -1.02)
 const BOOK_OPEN_UP = new THREE.Vector3(0, 0.95, -0.31).normalize()
 
 export function Camera() {
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
   const { size } = useThree()
+  const aspect = size.width / Math.max(size.height, 1)
   const isMobile = size.width < 768
+  const isPortrait = aspect < 1.0
+
+  // Dynamically calculate camera vertical FOV based on aspect ratio
+  // In Three.js, fov is VERTICAL degrees. When screen is narrow (portrait / mobile),
+  // horizontal FOV = 2 * atan(tan(fov/2) * aspect).
+  // If we don't increase vertical FOV on tall narrow screens, the horizontal field of view
+  // shrinks dramatically, cutting off the desk sides, motorcycle room, and controls.
+  const dynamicFov = useMemo(() => {
+    if (aspect < 0.6) return 66 // Tall phones (e.g. 9:19.5, 9:20)
+    if (aspect < 0.8) return 58 // Standard mobile portrait (e.g. 390x844)
+    if (aspect < 1.05) return 52 // Square/Tablet portrait (e.g. iPad portrait 3:4)
+    if (aspect < 1.45) return 47 // Tablet landscape / Small laptop
+    return 45 // Standard desktop & ultrawide
+  }, [aspect])
 
   const interactionRef = useCameraInteraction()
   const { activeObject, activeBook, isAnyObjectOpen } = useWorkspaceFocus()
   const { stage, completeEntrance, completeExit, isReducedMotion } = useRoomEntrance()
 
   // Default third-person elevated position behind the chair
-  const defaultPos = isMobile
-    ? new THREE.Vector3(0.2, 1.85, 2.55)
-    : new THREE.Vector3(0.28, 1.75, 2.05)
+  // On portrait/mobile, move slightly further back and up to give a comfortable panorama
+  const defaultPos = useMemo(() => {
+    if (aspect < 0.65) {
+      return new THREE.Vector3(0.18, 1.95, 2.85)
+    }
+    if (isMobile || isPortrait) {
+      return new THREE.Vector3(0.2, 1.88, 2.55)
+    }
+    return new THREE.Vector3(0.28, 1.75, 2.05)
+  }, [aspect, isMobile, isPortrait])
 
   // Default focal point looking at the desk and monitor
   const defaultLookAt = new THREE.Vector3(0, 0.92, -0.75)
@@ -117,6 +145,12 @@ export function Camera() {
 
   useFrame(({ clock }, delta) => {
     if (!cameraRef.current) return
+
+    // Update dynamic FOV smoothly if window resized or rotated
+    if (Math.abs(cameraRef.current.fov - dynamicFov) > 0.05) {
+      cameraRef.current.fov = THREE.MathUtils.lerp(cameraRef.current.fov, dynamicFov, 0.1)
+      cameraRef.current.updateProjectionMatrix()
+    }
 
     const { pointerX, pointerY, scrollProgress, reducedMotion, isTouch } =
       interactionRef.current
@@ -184,50 +218,57 @@ export function Camera() {
       THREE.MathUtils.clamp(desiredZ, BOUNDS.minZ, BOUNDS.maxZ),
     )
 
-    const lookX = defaultLookAt.x + px * (isTouch ? 0.05 : 0.09)
-    const lookY = defaultLookAt.y + py * (isTouch ? 0.04 : 0.07) + s * 0.06
+    const lookX = defaultLookAt.x + px * (isTouch ? 0.04 : 0.09)
+    const lookY = defaultLookAt.y + py * (isTouch ? 0.03 : 0.07) + s * 0.06
     const lookZ = defaultLookAt.z - s * 0.08
     workspaceLookScratch.current.set(lookX, lookY, lookZ)
 
     // 2. Select Goal Coordinates based on active object or stage
     const entranceT = entranceTRef.current
+    const isMobileLayout = isMobile || isPortrait
 
     if (entranceT < 1) {
       // Transitioning through the door
       const smoothEntranceT = entranceT * entranceT * (3 - 2 * entranceT)
-      const startPos = isMobile ? ENTRANCE_CAMERA_MOBILE_POS : ENTRANCE_CAMERA_DESKTOP_POS
+      const startPos = isMobileLayout ? ENTRANCE_CAMERA_MOBILE_POS : ENTRANCE_CAMERA_DESKTOP_POS
       const startLook = ENTRANCE_LOOK_AT
 
       goalPosRef.current.lerpVectors(startPos, workspacePosScratch.current, smoothEntranceT)
       goalLookRef.current.lerpVectors(startLook, workspaceLookScratch.current, smoothEntranceT)
       goalUpRef.current.set(0, 1, 0)
     } else if (activeObject === 'about-me-notebook') {
-      goalPosRef.current.copy(isMobile ? NOTEBOOK_CAMERA_MOBILE_POS : NOTEBOOK_CAMERA_DESKTOP_POS)
+      goalPosRef.current.copy(isMobileLayout ? NOTEBOOK_CAMERA_MOBILE_POS : NOTEBOOK_CAMERA_DESKTOP_POS)
       goalLookRef.current.copy(NOTEBOOK_LOOK_AT)
       goalUpRef.current.copy(NOTEBOOK_UP)
     } else if (activeObject === 'contact-smartphone') {
-      goalPosRef.current.copy(isMobile ? SMARTPHONE_CAMERA_MOBILE_POS : SMARTPHONE_CAMERA_DESKTOP_POS)
+      goalPosRef.current.copy(isMobileLayout ? SMARTPHONE_CAMERA_MOBILE_POS : SMARTPHONE_CAMERA_DESKTOP_POS)
       goalLookRef.current.copy(SMARTPHONE_LOOK_AT)
       goalUpRef.current.copy(SMARTPHONE_UP)
     } else if (activeObject === 'music-player') {
-      goalPosRef.current.copy(isMobile ? MUSIC_PLAYER_CAMERA_MOBILE_POS : MUSIC_PLAYER_CAMERA_DESKTOP_POS)
+      goalPosRef.current.copy(isMobileLayout ? MUSIC_PLAYER_CAMERA_MOBILE_POS : MUSIC_PLAYER_CAMERA_DESKTOP_POS)
       goalLookRef.current.copy(MUSIC_PLAYER_LOOK_AT)
       goalUpRef.current.copy(MUSIC_PLAYER_UP)
     } else if (activeObject === 'wall-art') {
-      goalPosRef.current.copy(isMobile ? WALL_ART_CAMERA_MOBILE_POS : WALL_ART_CAMERA_DESKTOP_POS)
+      goalPosRef.current.copy(isMobileLayout ? WALL_ART_CAMERA_MOBILE_POS : WALL_ART_CAMERA_DESKTOP_POS)
       goalLookRef.current.copy(WALL_ART_LOOK_AT)
       goalUpRef.current.copy(WALL_ART_UP)
+    } else if (activeObject === 'bike-showroom') {
+      goalPosRef.current.copy(
+        isMobileLayout ? BIKE_SHOWROOM_CAMERA_MOBILE_POS : BIKE_SHOWROOM_CAMERA_DESKTOP_POS,
+      )
+      goalLookRef.current.copy(BIKE_SHOWROOM_LOOK_AT)
+      goalUpRef.current.copy(BIKE_SHOWROOM_UP)
     } else if (activeObject === 'wall-note') {
-      goalPosRef.current.copy(isMobile ? WALL_NOTE_CAMERA_MOBILE_POS : WALL_NOTE_CAMERA_DESKTOP_POS)
+      goalPosRef.current.copy(isMobileLayout ? WALL_NOTE_CAMERA_MOBILE_POS : WALL_NOTE_CAMERA_DESKTOP_POS)
       goalLookRef.current.copy(WALL_NOTE_LOOK_AT)
       goalUpRef.current.copy(WALL_NOTE_UP)
     } else if (activeObject === 'bookshelf') {
       if (activeBook !== null) {
-        goalPosRef.current.copy(isMobile ? BOOK_OPEN_CAMERA_MOBILE_POS : BOOK_OPEN_CAMERA_DESKTOP_POS)
+        goalPosRef.current.copy(isMobileLayout ? BOOK_OPEN_CAMERA_MOBILE_POS : BOOK_OPEN_CAMERA_DESKTOP_POS)
         goalLookRef.current.copy(BOOK_OPEN_LOOK_AT)
         goalUpRef.current.copy(BOOK_OPEN_UP)
       } else {
-        goalPosRef.current.copy(isMobile ? BOOKSHELF_CAMERA_MOBILE_POS : BOOKSHELF_CAMERA_DESKTOP_POS)
+        goalPosRef.current.copy(isMobileLayout ? BOOKSHELF_CAMERA_MOBILE_POS : BOOKSHELF_CAMERA_DESKTOP_POS)
         goalLookRef.current.copy(BOOKSHELF_LOOK_AT)
         goalUpRef.current.copy(BOOKSHELF_UP)
       }
@@ -283,7 +324,7 @@ export function Camera() {
       ref={cameraRef}
       makeDefault
       position={[initialCamPos.x, initialCamPos.y, initialCamPos.z]}
-      fov={isMobile ? 52 : 45}
+      fov={dynamicFov}
       near={0.1}
       far={30}
     />

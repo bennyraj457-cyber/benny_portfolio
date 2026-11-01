@@ -30,5 +30,7 @@ dist-ssr
 # Vercel
 .vercel
 
+# Test artifacts
+test-results/
+playwright-report/
 
-.vercel

@@ -26,6 +26,7 @@ export function StoryScrollBridge() {
     openSmartphone,
     openWallArt,
     openWallNote,
+    openBikeShowroom,
     returnToWorkspace,
   } = useWorkspaceFocus()
 
@@ -51,6 +52,8 @@ export function StoryScrollBridge() {
 
     if (stepId === 'room-overview') {
       returnToWorkspace()
+    } else if (stepId === 'bike-showroom') {
+      openBikeShowroom()
     } else if (stepId === 'notebook') {
       openNotebook()
     } else if (stepId === 'bookshelf') {
@@ -82,7 +85,8 @@ export function StoryScrollBridge() {
 
     if (stage === 'WORKSPACE') {
       let targetStepId: StoryStepId = 'room-overview'
-      if (activeObject === 'about-me-notebook') targetStepId = 'notebook'
+      if (activeObject === 'bike-showroom') targetStepId = 'bike-showroom'
+      else if (activeObject === 'about-me-notebook') targetStepId = 'notebook'
       else if (activeObject === 'bookshelf') targetStepId = 'bookshelf'
       else if (activeObject === 'music-player') targetStepId = 'music-player'
       else if (activeObject === 'contact-smartphone') targetStepId = 'smartphone'

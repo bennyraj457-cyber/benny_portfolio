@@ -338,8 +338,9 @@ export function InteractiveBookshelf() {
 
   // Animation for shelf hover in Stage 1
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.1)
     const target = isShelfHovered && !isBookshelfOpen ? 1 : 0
+    if (target === 0 && hoverAnimRef.current < 0.001) return
+    const dt = Math.min(delta, 0.1)
     hoverAnimRef.current += (target - hoverAnimRef.current) * (1 - Math.exp(-10 * dt))
     const ha = hoverAnimRef.current
 

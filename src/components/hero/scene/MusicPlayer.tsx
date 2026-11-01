@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { RoundedBox } from '@react-three/drei'
+import { RoundedBox, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { useMusicPlayer } from '@/hooks/useMusicPlayer'
 import { useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
@@ -129,6 +129,7 @@ export function MusicPlayer({
   const { isMusicPlayerOpen, isAnyObjectOpen, openMusicPlayer } = useWorkspaceFocus()
 
   const [isPlayerHovered, setIsPlayerHovered] = useState(false)
+  const [isNearPlayer, setIsNearPlayer] = useState(false)
   const [hoveredControl, setHoveredControl] = useState<string | null>(null)
   const [pressedControl, setPressedControl] = useState<string | null>(null)
 
@@ -198,8 +199,20 @@ export function MusicPlayer({
   }, [currentTrack.title, currentTrack.artist, isPlaying, redrawDial])
 
   // Spin the vinyl record when playing, and pivot tonearm
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1)
+
+    // Check camera distance to music player (position: [0.62, 0.759, -0.12])
+    const camPos = state.camera.position
+    const dx = camPos.x - 0.62
+    const dy = camPos.y - 0.759
+    const dz = camPos.z - (-0.12)
+    const distSq = dx * dx + dy * dy + dz * dz
+    // Camera is near when distance is within ~1.75 meters (e.g. focused view or camera panning nearby)
+    const near = distSq < 3.06
+    if (near !== isNearPlayer) {
+      setIsNearPlayer(near)
+    }
 
     // Update dial progress at ~4 FPS during playback (avoids 60fps canvas rasterization)
     if (isPlaying) {
@@ -802,6 +815,96 @@ export function MusicPlayer({
         artist={currentTrack.artist}
         isMusicPlayerOpen={isMusicPlayerOpen}
       />
+
+      {/* ========================================================= */}
+      {/* 6. FLOATING MINI MUSIC CONTROLS (Floating in Air)         */}
+      {/* ========================================================= */}
+      {(isMusicPlayerOpen || isNearPlayer || isPlayerHovered) && (
+        <Html
+          position={[0.015, 0.235, 0.04]}
+          center
+          distanceFactor={isMusicPlayerOpen ? 0.72 : 1.15}
+          zIndexRange={[50, 0]}
+        >
+          <div
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-[#24170f]/90 backdrop-blur-md border border-[#c5984b]/40 shadow-[0_4px_16px_rgba(20,10,5,0.45)] select-none pointer-events-auto transition-all duration-200 hover:border-[#f5d000] hover:scale-105 touch-manipulation"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {/* Ambient Gold Status Dot */}
+            <span
+              className={`w-1 h-1 rounded-full ${
+                isPlaying ? 'bg-[#f5d000] animate-pulse shadow-[0_0_5px_#f5d000]' : 'bg-[#c5984b]/50'
+              }`}
+            />
+
+            {/* Previous Track */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                prevTrack()
+              }}
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex items-center justify-center rounded-full bg-black/20 hover:bg-[#c5984b]/30 active:scale-90 text-[#fbf9f3] transition-all hover:text-[#f5d000] touch-manipulation"
+              title="Previous Track"
+            >
+              <svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+              </svg>
+            </button>
+
+            {/* Play / Pause Primary Button (Antique Gold & Black Accent) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                togglePlay()
+              }}
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center rounded-full bg-[#f5d000] hover:bg-[#ffe043] active:scale-85 text-[#1a120b] shadow-sm transition-all touch-manipulation"
+              title={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? (
+                <svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" className="translate-x-0.5">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Next Track */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                nextTrack()
+              }}
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex items-center justify-center rounded-full bg-black/20 hover:bg-[#c5984b]/30 active:scale-90 text-[#fbf9f3] transition-all hover:text-[#f5d000] touch-manipulation"
+              title="Next Track"
+            >
+              <svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+              </svg>
+            </button>
+
+            {/* Volume Cycle Toggle */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                const nextVol = volume >= 0.9 ? 0.3 : volume >= 0.6 ? 1.0 : 0.7
+                setVolume(nextVol)
+              }}
+              className="px-1 h-3.5 sm:h-4 flex items-center justify-center rounded-full bg-black/20 hover:bg-[#c5984b]/30 active:scale-90 text-[#d5c2a1] hover:text-[#f5d000] text-[7px] sm:text-[8px] font-mono transition-all touch-manipulation"
+              title={`Volume: ${Math.round(volume * 100)}%`}
+            >
+              {Math.round(volume * 100)}%
+            </button>
+          </div>
+        </Html>
+      )}
     </group>
   )
 }

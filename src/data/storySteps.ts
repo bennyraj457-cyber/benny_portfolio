@@ -1,6 +1,7 @@
 export type StoryStepId =
   | 'door'
   | 'room-overview'
+  | 'bike-showroom'
   | 'notebook'
   | 'bookshelf'
   | 'music-player'
@@ -35,8 +36,16 @@ export const STORY_STEPS: StoryStep[] = [
     hint: 'Click Next to tour each station or click any object',
   },
   {
-    id: 'notebook',
+    id: 'bike-showroom',
     stepNumber: 3,
+    title: '1970 Honda CB750 & Glass Patio',
+    subtitle: 'Classic Super Sport & Sunlight Terrace Door',
+    category: 'GARAGE SHOWCASE',
+    hint: 'Click the glass door to open/close or click Next',
+  },
+  {
+    id: 'notebook',
+    stepNumber: 4,
     title: 'About Me Notebook',
     subtitle: 'Creative Developer & UI/UX Designer',
     category: 'BIOGRAPHY & PHILOSOPHY',
@@ -44,7 +53,7 @@ export const STORY_STEPS: StoryStep[] = [
   },
   {
     id: 'bookshelf',
-    stepNumber: 4,
+    stepNumber: 5,
     title: 'Skills & Tech Stack',
     subtitle: 'React • Three.js • TypeScript • UI/UX',
     category: 'KNOWLEDGE & CAPABILITIES',
@@ -52,7 +61,7 @@ export const STORY_STEPS: StoryStep[] = [
   },
   {
     id: 'music-player',
-    stepNumber: 5,
+    stepNumber: 6,
     title: 'Vintage Gramophone',
     subtitle: 'Soundtrack & Ambient Audio',
     category: 'AUDIO & AMBIENCE',
@@ -60,7 +69,7 @@ export const STORY_STEPS: StoryStep[] = [
   },
   {
     id: 'smartphone',
-    stepNumber: 6,
+    stepNumber: 7,
     title: "Let's Connect",
     subtitle: 'Direct Messaging & Social Links',
     category: 'COMMUNICATION',
@@ -68,7 +77,7 @@ export const STORY_STEPS: StoryStep[] = [
   },
   {
     id: 'wall-art',
-    stepNumber: 7,
+    stepNumber: 8,
     title: 'Framed Gallery Art',
     subtitle: 'Live Artwork from Supabase',
     category: 'EXHIBITION',
@@ -76,7 +85,7 @@ export const STORY_STEPS: StoryStep[] = [
   },
   {
     id: 'wall-note',
-    stepNumber: 8,
+    stepNumber: 9,
     title: 'Studio Notice',
     subtitle: 'Workspace Expansion & Updates',
     category: 'NOTICE BOARD',

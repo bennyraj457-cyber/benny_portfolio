@@ -5,6 +5,8 @@ export interface Track {
   duration: number // in seconds
   src: string
   coverLabel: string
+  startTime?: number // optional start offset in seconds
+  endTime?: number // optional end cutoff in seconds
 }
 
 export const PLAYLIST: Track[] = [

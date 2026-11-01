@@ -85,24 +85,12 @@ export function WorkspaceFallback() {
 }
 
 function BackToWorkspaceControl() {
-  const { isAnyObjectOpen, isBookshelfOpen, isBookOpened, closeBook, returnToWorkspace } =
-    useWorkspaceFocus()
+  const { isAnyObjectOpen, returnToWorkspace } = useWorkspaceFocus()
   const { stage, exitToDoor } = useRoomEntrance()
 
   // Don't show workspace controls while still in entrance sequence
   if (stage !== 'WORKSPACE') {
     return null
-  }
-
-  // When an individual book is open, the button says "Back to Bookshelf" and closes the book.
-  // When in bookshelf stage or any other desk object, it says "Back to Workspace".
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (isBookOpened) {
-      closeBook()
-    } else {
-      returnToWorkspace()
-    }
   }
 
   const handleExitClick = (e: React.MouseEvent) => {
@@ -111,59 +99,22 @@ function BackToWorkspaceControl() {
     exitToDoor()
   }
 
-  const labelText = isBookOpened ? 'Back to Bookshelf' : 'Back to Workspace'
-
   return (
     <>
       {/* Top Right Exit to Door Button when in normal Workspace */}
       {!isAnyObjectOpen && (
-        <div className="absolute top-6 right-6 z-30 animate-fade-in">
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 animate-fade-in pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)]">
           <button
             type="button"
             onClick={handleExitClick}
-            className="group inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/75 hover:bg-white px-4 py-2 text-xs font-mono tracking-wider text-[#181917] shadow-sm backdrop-blur-md transition-all duration-300 hover:border-[#f5d000] hover:scale-105 active:scale-95"
+            className="group inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-black/10 bg-white/80 hover:bg-white px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-mono tracking-wider text-[#181917] shadow-sm backdrop-blur-md transition-all duration-300 hover:border-[#f5d000] hover:scale-105 active:scale-95 touch-manipulation"
             title="Exit Room back to the Door"
           >
-            <span className="text-sm transition-transform group-hover:-translate-x-0.5">←</span>
+            <span className="text-xs sm:text-sm transition-transform group-hover:-translate-x-0.5">←</span>
             <span className="font-semibold uppercase">EXIT ROOM</span>
           </button>
         </div>
       )}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex flex-col items-center gap-3">
-        {/* Small Instruction Banner when Bookshelf is open but no book is selected */}
-        {isBookshelfOpen && !isBookOpened && (
-          <div className="pointer-events-none rounded-full border border-[#f5d000]/40 bg-[#181917]/90 px-4 py-1.5 text-[11px] font-mono tracking-widest text-[#f5d000] uppercase shadow-md backdrop-blur-md animate-pulse">
-            SELECT A BOOK TO EXPLORE
-          </div>
-        )}
-
-        {/* Main Back Navigation Control */}
-        <div
-          className={`transition-all duration-500 ${
-            isAnyObjectOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
-          }`}
-          aria-hidden={!isAnyObjectOpen}
-        >
-          <button
-            type="button"
-            onClick={handleClick}
-            tabIndex={isAnyObjectOpen ? 0 : -1}
-            className={`${
-              isAnyObjectOpen ? 'pointer-events-auto' : 'pointer-events-none'
-            } group inline-flex items-center gap-3 rounded-full border border-[#181917]/20 bg-[#181917]/95 px-5 py-2.5 text-xs font-medium tracking-[0.14em] uppercase text-[#fbf9f3] shadow-lg backdrop-blur-md transition-all duration-300 hover:border-[#f5d000] hover:bg-[#181917] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f5d000]`}
-          >
-            <span
-              className="inline-block h-2 w-2 rounded-full bg-[#f5d000] transition-transform duration-300 group-hover:scale-125"
-              aria-hidden="true"
-            />
-            <span>{labelText}</span>
-            <kbd className="ml-1 hidden rounded border border-white/15 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#dcdad4] sm:inline-block">
-              ESC
-            </kbd>
-          </button>
-        </div>
-      </div>
     </>
   )
 }
@@ -180,7 +131,7 @@ function SceneReadyNotifier() {
     if (dismissedRef.current) return
     frameCountRef.current += 1
 
-    if (frameCountRef.current >= 4) {
+    if (frameCountRef.current >= 2) {
       dismissedRef.current = true
       const win = window as unknown as { __loaderInterval?: number }
       if (win.__loaderInterval) {
@@ -197,9 +148,9 @@ function SceneReadyNotifier() {
         const loader = document.getElementById('initial-loader')
         if (loader) {
           loader.classList.add('loader-hidden')
-          setTimeout(() => loader.remove(), 750)
+          setTimeout(() => loader.remove(), 450)
         }
-      }, 220)
+      }, 100)
     }
   })
 

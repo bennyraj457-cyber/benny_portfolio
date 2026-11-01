@@ -21,6 +21,38 @@ export interface MusicPlayerState {
 let sharedAudio: HTMLAudioElement | null = null
 
 /**
+ * Returns default start time (in seconds) for tracks that should skip an intro
+ * (e.g. Dua Lipa - "Love Again" starts at 28s).
+ */
+function getTrackStartTime(track?: Partial<Track> | null): number {
+  if (!track) return 0
+  if (typeof track.startTime === 'number' && track.startTime > 0) {
+    return track.startTime
+  }
+  const combined = `${track.title || ''} ${track.artist || ''} ${track.src || ''}`.toLowerCase()
+  if (combined.includes('love again') || combined.includes('love_again') || combined.includes('dua')) {
+    return 28
+  }
+  return 0
+}
+
+/**
+ * Returns default end cutoff time (in seconds) for tracks that should stop early
+ * (e.g. Dua Lipa - "Love Again" ends at 1m 20s = 80s).
+ */
+function getTrackEndTime(track?: Partial<Track> | null): number {
+  if (!track) return 0
+  if (typeof track.endTime === 'number' && track.endTime > 0) {
+    return track.endTime
+  }
+  const combined = `${track.title || ''} ${track.artist || ''} ${track.src || ''}`.toLowerCase()
+  if (combined.includes('love again') || combined.includes('love_again') || combined.includes('dua')) {
+    return 80 // 1 min 20 sec
+  }
+  return 0
+}
+
+/**
  * Updates sound balance based on camera distance to the music player.
  * Player is located at (0.62, 0.88, -1.02).
  */
@@ -52,7 +84,7 @@ export function useMusicPlayer(): MusicPlayerState {
 
   const currentTrack = playlist[currentTrackIndex] || PLAYLIST[0]
 
-  // 1. Fetch songs from Supabase if configured
+  // 1. Fetch songs from Supabase ('songs' table + 'Songs' storage bucket fallback)
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return
 
@@ -60,28 +92,113 @@ export function useMusicPlayer(): MusicPlayerState {
 
     async function fetchSongs() {
       try {
+        const collectedTracks: Track[] = []
+
+        // A. Query the 'songs' database table
         const { data, error } = await supabase!
           .from('songs')
           .select('*')
-          .order('order_index', { ascending: true })
+          .order('created_at', { ascending: false })
 
-        if (error) {
-          console.warn('Supabase fetch error, fallback to local playlist:', error.message)
-          return
+        if (!error && data && data.length > 0) {
+          for (const item of data) {
+            const trackObj: Track = {
+              id: String(item.id),
+              title: item.title || 'Untitled Track',
+              artist: item.artist || 'Studio Artist',
+              duration: Number(item.duration) || 0,
+              src: item.src,
+              coverLabel: item.cover_label || 'POP / DISCO',
+            }
+            trackObj.startTime = getTrackStartTime(trackObj)
+            trackObj.endTime = getTrackEndTime(trackObj)
+            if (trackObj.endTime > 0) {
+              trackObj.duration = trackObj.endTime
+            }
+            collectedTracks.push(trackObj)
+          }
         }
 
-        if (data && data.length > 0 && isMounted) {
-          const supabaseTracks: Track[] = data.map((item) => ({
-            id: item.id,
-            title: item.title,
-            artist: item.artist,
-            duration: Number(item.duration) || 0,
-            src: item.src,
-            coverLabel: item.cover_label || 'CHILL',
-          }))
+        // B. Also check Supabase Storage 'Songs' / 'songs' buckets for any uploaded audio files
+        //    (In case the user uploaded directly to Supabase Storage -> Songs bucket!)
+        for (const bucketName of ['Songs', 'songs']) {
+          const { data: bucketFiles, error: bucketError } = await supabase!.storage
+            .from(bucketName)
+            .list('', {
+              limit: 25,
+              sortBy: { column: 'created_at', order: 'desc' },
+            })
 
-          setPlaylist(supabaseTracks)
+          if (!bucketError && bucketFiles && bucketFiles.length > 0) {
+            for (const file of bucketFiles) {
+              if (
+                !file.name ||
+                file.name === '.emptyFolderPlaceholder' ||
+                !/\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(file.name)
+              ) {
+                continue
+              }
+
+              const { data: pubData } = supabase!.storage
+                .from(bucketName)
+                .getPublicUrl(file.name)
+
+              const publicUrl = pubData?.publicUrl
+              if (!publicUrl) continue
+
+              // Skip if this file is already in the database table tracks
+              const alreadyExists = collectedTracks.some((t) =>
+                t.src.includes(encodeURIComponent(file.name)) || t.src.includes(file.name),
+              )
+              if (alreadyExists) continue
+
+              // Clean up filename into Title & Artist (e.g. "Dua Lipa - Love Again.mp3")
+              const baseName = file.name.replace(/\.(mp3|wav|ogg|m4a|flac|aac)$/i, '').replace(/_/g, ' ').trim()
+              let parsedArtist = 'Dua Lipa'
+              let parsedTitle = baseName
+
+              if (baseName.includes(' - ')) {
+                const parts = baseName.split(' - ')
+                parsedArtist = parts[0].trim()
+                parsedTitle = parts.slice(1).join(' - ').trim()
+              } else if (baseName.toLowerCase().includes('love again')) {
+                parsedTitle = 'Love Again'
+                parsedArtist = 'Dua Lipa'
+              }
+
+              const storageTrack: Track = {
+                id: `storage-${file.id || file.name}`,
+                title: parsedTitle,
+                artist: parsedArtist,
+                duration: 0,
+                src: publicUrl,
+                coverLabel: 'STUDIO STREAM',
+              }
+              storageTrack.startTime = getTrackStartTime(storageTrack)
+              storageTrack.endTime = getTrackEndTime(storageTrack)
+              if (storageTrack.endTime > 0) {
+                storageTrack.duration = storageTrack.endTime
+              }
+              collectedTracks.unshift(storageTrack)
+            }
+          }
+        }
+
+        if (collectedTracks.length > 0 && isMounted) {
+          const firstStart = getTrackStartTime(collectedTracks[0])
+          const firstEnd = getTrackEndTime(collectedTracks[0])
+          setPlaylist(collectedTracks)
           setCurrentTrackIndex(0)
+          setCurrentTime(firstStart)
+          if (firstEnd > 0) {
+            setDuration(firstEnd)
+          }
+          if (sharedAudio) {
+            sharedAudio.src = collectedTracks[0].src
+            sharedAudio.dataset.startTime = String(firstStart)
+            sharedAudio.dataset.endTime = String(firstEnd)
+            sharedAudio.load()
+          }
         }
       } catch (err) {
         console.warn('Supabase fetch failed:', err)
@@ -92,8 +209,21 @@ export function useMusicPlayer(): MusicPlayerState {
 
     fetchSongs()
 
+    // C. Realtime subscription so changes in the Supabase 'songs' table update live
+    const channel = supabase
+      .channel('public:songs')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'songs' },
+        () => {
+          fetchSongs()
+        },
+      )
+      .subscribe()
+
     return () => {
       isMounted = false
+      supabase?.removeChannel(channel)
     }
   }, [])
 
@@ -109,21 +239,49 @@ export function useMusicPlayer(): MusicPlayerState {
 
     const audio = sharedAudio
 
+    const handleTrackFinish = () => {
+      setCurrentTrackIndex((prev) => {
+        const nextIdx = (prev + 1) % playlist.length
+        if (nextIdx === prev && sharedAudio) {
+          const startOffset = Number(sharedAudio.dataset.startTime || 0)
+          sharedAudio.currentTime = startOffset
+          setCurrentTime(startOffset)
+          sharedAudio.play().catch(() => {})
+        }
+        return nextIdx
+      })
+    }
+
     const updateTime = () => {
+      const targetEnd = Number(audio.dataset.endTime || 0)
+      if (targetEnd > 0 && audio.currentTime >= targetEnd) {
+        handleTrackFinish()
+        return
+      }
       setCurrentTime(audio.currentTime)
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      if (targetEnd > 0) {
+        setDuration(targetEnd)
+      } else if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration)
       }
     }
 
     const onLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      const targetEnd = Number(audio.dataset.endTime || 0)
+      if (targetEnd > 0) {
+        setDuration(targetEnd)
+      } else if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration)
+      }
+      const targetStart = Number(audio.dataset.startTime || 0)
+      if (targetStart > 0 && audio.currentTime < targetStart - 0.5) {
+        audio.currentTime = targetStart
+        setCurrentTime(targetStart)
       }
     }
 
     const onEnded = () => {
-      setCurrentTrackIndex((prev) => (prev + 1) % playlist.length)
+      handleTrackFinish()
     }
 
     const onPlay = () => setIsPlaying(true)
@@ -151,33 +309,67 @@ export function useMusicPlayer(): MusicPlayerState {
     if (!sharedAudio || !currentTrack) return
     const audio = sharedAudio
     const wasPlaying = isPlaying
+    const startOffset = getTrackStartTime(currentTrack)
+    const endCutoff = getTrackEndTime(currentTrack)
+    audio.dataset.startTime = String(startOffset)
+    audio.dataset.endTime = String(endCutoff)
+    if (endCutoff > 0) {
+      setDuration(endCutoff)
+    }
 
     if (audio.src !== currentTrack.src) {
       audio.src = currentTrack.src
-      audio.currentTime = 0
-      setCurrentTime(0)
+      audio.currentTime = startOffset
+      setCurrentTime(startOffset)
 
       if (wasPlaying) {
-        audio.play().catch((err) => {
-          console.warn('Audio play error:', err)
-          setIsPlaying(false)
-        })
+        audio
+          .play()
+          .then(() => {
+            if (startOffset > 0 && audio.currentTime < startOffset - 0.5) {
+              audio.currentTime = startOffset
+            }
+          })
+          .catch((err) => {
+            console.warn('Audio play error:', err)
+            setIsPlaying(false)
+          })
       }
     }
-  }, [currentTrack?.src, currentTrackIndex, isPlaying])
+  }, [currentTrack, currentTrack?.src, currentTrackIndex, isPlaying])
 
   const togglePlay = useCallback(() => {
     if (!sharedAudio || !currentTrack) return
     const audio = sharedAudio
+    const startOffset = getTrackStartTime(currentTrack)
+    const endCutoff = getTrackEndTime(currentTrack)
+    audio.dataset.startTime = String(startOffset)
+    audio.dataset.endTime = String(endCutoff)
+    if (endCutoff > 0) {
+      setDuration(endCutoff)
+    }
 
     if (!audio.src || audio.src !== currentTrack.src) {
       audio.src = currentTrack.src
+      audio.currentTime = startOffset
+      setCurrentTime(startOffset)
+    } else if (
+      audio.paused &&
+      ((startOffset > 0 && audio.currentTime < startOffset - 0.5) ||
+        (endCutoff > 0 && audio.currentTime >= endCutoff - 0.5))
+    ) {
+      audio.currentTime = startOffset
+      setCurrentTime(startOffset)
     }
 
     if (audio.paused) {
       audio
         .play()
         .then(() => {
+          if (startOffset > 0 && audio.currentTime < startOffset - 0.5) {
+            audio.currentTime = startOffset
+            setCurrentTime(startOffset)
+          }
           setIsPlaying(true)
         })
         .catch((err) => {

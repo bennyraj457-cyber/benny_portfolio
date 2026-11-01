@@ -14,18 +14,22 @@ export function Lighting() {
   const screenFillRef = useRef<THREE.PointLight>(null)
   const rimSpotRef = useRef<THREE.SpotLight>(null)
 
-  // Night Mode target colors and intensities
-  const targetAmbientColor = useMemoColor(isNightMode ? '#1a1f2c' : '#fbf9f3')
-  const targetAmbientIntensity = isNightMode ? 0.22 : 0.65
+  // In Day Mode: all artificial room lights are switched OFF (0 intensity) and the room is
+  // illuminated purely by natural sunlight streaming through the left side glass door!
+  // In Night Mode: artificial studio lights (screen fill, rim spot, desk lamp, bike spot) switch ON.
+  const targetAmbientColor = useMemoColor(isNightMode ? '#1a1f2c' : '#fff3e0')
+  const targetAmbientIntensity = isNightMode ? 0.22 : 0.42
 
-  const targetHemiSkyColor = useMemoColor(isNightMode ? '#222d42' : '#ffffff')
-  const targetHemiGroundColor = useMemoColor(isNightMode ? '#10141d' : '#dcdad4')
-  const targetHemiIntensity = isNightMode ? 0.18 : 0.55
+  const targetHemiSkyColor = useMemoColor(isNightMode ? '#222d42' : '#ffe4c4')
+  const targetHemiGroundColor = useMemoColor(isNightMode ? '#10141d' : '#dcd2c0')
+  const targetHemiIntensity = isNightMode ? 0.18 : 0.48
 
+  // Right-side studio key light is OFF in daytime so all directional shadows come from the left side window sun
   const targetSunColor = useMemoColor(isNightMode ? '#3f5982' : '#fbf9f3')
-  const targetSunIntensity = isNightMode ? 0.15 : 1.35
+  const targetSunIntensity = isNightMode ? 0.18 : 0.0
 
-  const targetScreenIntensity = isNightMode ? 0.85 : 0.35
+  // Monitor screen fill and artificial rim spotlight are OFF in daytime
+  const targetScreenIntensity = isNightMode ? 0.85 : 0.0
   const targetScreenColor = useMemoColor(isNightMode ? '#a0c4ff' : '#f5f3ee')
 
   useFrame((_, delta) => {
@@ -53,7 +57,7 @@ export function Lighting() {
     }
 
     if (rimSpotRef.current) {
-      const targetRim = isNightMode ? 0.25 : 0.6
+      const targetRim = isNightMode ? 0.45 : 0.0
       rimSpotRef.current.intensity = THREE.MathUtils.damp(rimSpotRef.current.intensity, targetRim, rate, delta)
     }
   })

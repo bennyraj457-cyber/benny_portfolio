@@ -211,8 +211,9 @@ export function PinnedWallNote({
 
   // Subtle interactive hover highlight animation
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.1)
     const target = isHovered && !isWallNoteOpen ? 1 : 0
+    if (target === 0 && hoverAnimRef.current < 0.001) return
+    const dt = Math.min(delta, 0.1)
     hoverAnimRef.current += (target - hoverAnimRef.current) * (1 - Math.exp(-12 * dt))
     if (highlightMatRef.current) {
       highlightMatRef.current.opacity = hoverAnimRef.current * 0.75

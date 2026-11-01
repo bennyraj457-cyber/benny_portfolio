@@ -58,6 +58,10 @@ export function MusicAtmosphere({
 
   const particleRefs = useRef<(HTMLDivElement | null)[]>([])
   const particleGroupRefs = useRef<(THREE.Group | null)[]>([])
+  const lyricGroupRef = useRef<THREE.Group>(null)
+  const lyricDomRef = useRef<HTMLParagraphElement>(null)
+  const lyricSpawnClockRef = useRef<number>(0)
+  const lastLyricTimeRef = useRef<number>(-1)
 
   // Load built-in synced lyrics or fetch from LRCLIB API for any future Supabase songs
   useEffect(() => {
@@ -65,9 +69,13 @@ export function MusicAtmosphere({
     const builtIn = getBuiltInLyricsForTrack(trackTitle, artist)
     setLyrics(builtIn)
 
+    const normalized = `${trackTitle} ${artist}`.toLowerCase()
     const isBuiltInMatch =
-      `${trackTitle} ${artist}`.toLowerCase().includes('thug') ||
-      `${trackTitle} ${artist}`.toLowerCase().includes('cena')
+      normalized.includes('love again') ||
+      normalized.includes('dua lipa') ||
+      normalized.includes('dua') ||
+      normalized.includes('thug') ||
+      normalized.includes('cena')
 
     if (isBuiltInMatch) return
 
@@ -98,8 +106,8 @@ export function MusicAtmosphere({
     }
   }, [trackTitle, artist])
 
-  // Determine the single currently active lyric line based on currentTime
-  const activeLyric = useMemo(() => {
+  // Determine the single currently active lyric line and its duration window based on currentTime
+  const activeLyricInfo = useMemo(() => {
     if (!lyrics || lyrics.length === 0) return null
     let idx = 0
     for (let i = 0; i < lyrics.length; i++) {
@@ -109,22 +117,28 @@ export function MusicAtmosphere({
         break
       }
     }
-    return lyrics[idx]
+    const current = lyrics[idx]
+    const next = lyrics[idx + 1]
+    // Duration for this lyric line to float up and fade out before the next line appears
+    const windowDuration = next
+      ? Math.max(1.2, Math.min(4.2, next.time - current.time))
+      : 3.5
+    return {
+      line: current,
+      windowDuration,
+    }
   }, [lyrics, currentTime])
 
-  // Animate floating musical notes when playing
+  // Animate floating musical notes and rising/fading song lyrics when playing
   useFrame((state) => {
+    if (!isPlaying) return
     const t = state.clock.getElapsedTime()
 
+    // 1. Animate musical note particles
     NOTE_PARTICLES.forEach((p, idx) => {
       const grp = particleGroupRefs.current[idx]
       const domEl = particleRefs.current[idx]
       if (!grp || !domEl) return
-
-      if (!isPlaying) {
-        domEl.style.opacity = '0'
-        return
-      }
 
       // Life cycle from 0 (turntable origin) to 1 (high in the air)
       const life = (t * p.speed + p.phaseOffset) % 1
@@ -147,6 +161,41 @@ export function MusicAtmosphere({
       domEl.style.opacity = String((alpha * 0.92).toFixed(2))
       domEl.style.transform = `scale(${scale.toFixed(2)}) rotate(${Math.sin(angle) * 16}deg)`
     })
+
+    // 2. Animate active lyric line rising in the air, gently swaying, and fading away like the note particles
+    if (lyricGroupRef.current && lyricDomRef.current && activeLyricInfo && isPlaying) {
+      if (lastLyricTimeRef.current !== activeLyricInfo.line.time) {
+        lastLyricTimeRef.current = activeLyricInfo.line.time
+        lyricSpawnClockRef.current = t
+      }
+
+      const elapsed = Math.max(0, t - lyricSpawnClockRef.current)
+      const life = Math.min(1, elapsed / activeLyricInfo.windowDuration)
+
+      // Float upward from turntable height (y = 0.22) up into the air (y = 0.48)
+      const y = 0.22 + life * 0.26
+      // Subtle gentle horizontal breeze sway
+      const swayX = Math.sin(t * 2.0 + activeLyricInfo.line.time) * 0.018 * life
+      const swayZ = Math.cos(t * 1.6 + activeLyricInfo.line.time) * 0.012 * life
+
+      lyricGroupRef.current.position.set(swayX, y, swayZ)
+
+      // Smooth fade-in at birth (0 -> 0.18), full visibility in middle, and soft fade-away as it floats high (0.68 -> 1.0)
+      const alpha =
+        life < 0.18
+          ? life / 0.18
+          : life > 0.68
+            ? Math.max(0, (1 - life) / 0.32)
+            : 1
+
+      const scale = 0.88 + Math.sin(life * Math.PI) * 0.14
+      const tilt = Math.sin(t * 1.8) * 2.5
+
+      lyricDomRef.current.style.opacity = String(alpha.toFixed(2))
+      lyricDomRef.current.style.transform = `scale(${scale.toFixed(3)}) rotate(${tilt.toFixed(1)}deg)`
+      lyricDomRef.current.style.filter =
+        life > 0.72 ? `blur(${((life - 0.72) * 6).toFixed(1)}px)` : 'none'
+    }
   })
 
   return (
@@ -183,29 +232,32 @@ export function MusicAtmosphere({
         </group>
       ))}
 
-      {/* 2. Only the Active Lyric Line Floating in Air (Warm Espresso & Antique Gold matching the Gramophone & Room) */}
-      {isPlaying && activeLyric && (
-        <Html
-          position={[0, 0.3, 0]}
-          center
-          distanceFactor={isMusicPlayerOpen ? 0.92 : 1.65}
-          className="pointer-events-none select-none"
-          zIndexRange={[40, 0]}
-        >
-          <div className="flex items-center justify-center w-[340px] sm:w-[440px] text-center">
-            <p
-              key={activeLyric.time}
-              style={{
-                color: '#2e1a0f',
-                textShadow:
-                  '-1.2px -1.2px 0 #fbf9f3, 1.2px -1.2px 0 #fbf9f3, -1.2px 1.2px 0 #fbf9f3, 1.2px 1.2px 0 #fbf9f3, 0 3px 10px rgba(197, 152, 75, 0.45)',
-              }}
-              className="font-serif italic text-base sm:text-lg font-bold tracking-wide leading-snug transition-all duration-300"
-            >
-              {activeLyric.text}
-            </p>
-          </div>
-        </Html>
+      {/* 2. Active Lyric Line Rising in Air and Fading Away Like the Music Particles */}
+      {isPlaying && activeLyricInfo && (
+        <group ref={lyricGroupRef} position={[0, 0.22, 0]}>
+          <Html
+            center
+            distanceFactor={isMusicPlayerOpen ? 0.92 : 1.65}
+            className="pointer-events-none select-none"
+            zIndexRange={[40, 0]}
+          >
+            <div className="flex items-center justify-center w-[85vw] max-w-[420px] px-3 text-center">
+              <p
+                ref={lyricDomRef}
+                key={activeLyricInfo.line.time}
+                style={{
+                  color: '#fffbf0',
+                  opacity: 0,
+                  textShadow:
+                    '0 0 14px rgba(245, 208, 0, 0.95), 0 0 24px rgba(255, 184, 108, 0.65), 0 2px 8px rgba(30, 20, 10, 0.75)',
+                }}
+                className="font-serif italic text-sm sm:text-base md:text-lg font-bold tracking-wide leading-snug transition-none will-change-transform"
+              >
+                {activeLyricInfo.line.text}
+              </p>
+            </div>
+          </Html>
+        </group>
       )}
     </group>
   )

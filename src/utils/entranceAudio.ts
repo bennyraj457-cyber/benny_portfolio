@@ -166,6 +166,53 @@ class RoomEntranceAudioController {
     osc.start(now)
     osc.stop(now + 0.85)
   }
+
+  /**
+   * Heavy architectural glass door slide / swing open & close sound
+   */
+  playGlassDoorSlide(isOpening: boolean) {
+    const ctx = this.getAudioContext()
+    if (!ctx) return
+
+    const now = ctx.currentTime
+
+    // 1. Crisp metallic latch release / engage click
+    const clickOsc = ctx.createOscillator()
+    const clickGain = ctx.createGain()
+    clickOsc.type = 'triangle'
+    clickOsc.frequency.setValueAtTime(isOpening ? 920 : 680, now)
+    clickOsc.frequency.exponentialRampToValueAtTime(220, now + 0.05)
+    clickGain.gain.setValueAtTime(0.2, now)
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06)
+    clickOsc.connect(clickGain)
+    clickGain.connect(ctx.destination)
+    clickOsc.start(now)
+    clickOsc.stop(now + 0.07)
+
+    // 2. Smooth heavy aluminum track / hinge whoosh
+    const glideOsc = ctx.createOscillator()
+    const glideFilter = ctx.createBiquadFilter()
+    const glideGain = ctx.createGain()
+
+    glideOsc.type = 'sawtooth'
+    glideOsc.frequency.setValueAtTime(isOpening ? 75 : 95, now + 0.04)
+    glideOsc.frequency.linearRampToValueAtTime(isOpening ? 110 : 65, now + 0.55)
+
+    glideFilter.type = 'bandpass'
+    glideFilter.frequency.setValueAtTime(240, now + 0.04)
+    glideFilter.Q.setValueAtTime(2.5, now + 0.04)
+
+    glideGain.gain.setValueAtTime(0.001, now + 0.04)
+    glideGain.gain.linearRampToValueAtTime(0.09, now + 0.16)
+    glideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.62)
+
+    glideOsc.connect(glideFilter)
+    glideFilter.connect(glideGain)
+    glideGain.connect(ctx.destination)
+
+    glideOsc.start(now + 0.04)
+    glideOsc.stop(now + 0.65)
+  }
 }
 
 export const entranceAudio = new RoomEntranceAudioController()
