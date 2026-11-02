@@ -14,12 +14,19 @@ interface StoryScrollContextValue {
   goToStep: (index: number) => void
   nextStep: () => void
   prevStep: () => void
+  scrollToStep: (index: number) => void
   isScrollingLocked: boolean
 }
 
 const StoryScrollContext = createContext<StoryScrollContextValue | null>(null)
 
-export function StoryScrollProvider({ children }: { children: ReactNode }) {
+export function StoryScrollProvider({
+  children,
+  onScrollToStep,
+}: {
+  children: ReactNode
+  onScrollToStep?: (index: number) => void
+}) {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0)
 
   const totalSteps = STORY_STEPS.length
@@ -32,13 +39,30 @@ export function StoryScrollProvider({ children }: { children: ReactNode }) {
     [totalSteps]
   )
 
+  const scrollToStep = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(totalSteps - 1, index))
+      setCurrentStepIndex(clamped)
+      onScrollToStep?.(clamped)
+    },
+    [totalSteps, onScrollToStep]
+  )
+
   const nextStep = useCallback(() => {
-    setCurrentStepIndex((prev) => (prev + 1) % totalSteps)
-  }, [totalSteps])
+    setCurrentStepIndex((prev) => {
+      const next = Math.min(totalSteps - 1, prev + 1)
+      onScrollToStep?.(next)
+      return next
+    })
+  }, [totalSteps, onScrollToStep])
 
   const prevStep = useCallback(() => {
-    setCurrentStepIndex((prev) => (prev - 1 + totalSteps) % totalSteps)
-  }, [totalSteps])
+    setCurrentStepIndex((prev) => {
+      const next = Math.max(0, prev - 1)
+      onScrollToStep?.(next)
+      return next
+    })
+  }, [totalSteps, onScrollToStep])
 
   const currentStep = STORY_STEPS[currentStepIndex]
 
@@ -51,6 +75,7 @@ export function StoryScrollProvider({ children }: { children: ReactNode }) {
         goToStep,
         nextStep,
         prevStep,
+        scrollToStep,
         isScrollingLocked: false,
       }}
     >

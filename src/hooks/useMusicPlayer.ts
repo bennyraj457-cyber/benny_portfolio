@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PLAYLIST, type Track } from '@/data/playlist'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import {
+  isSupabaseConfigured,
+  supabaseRestSelect,
+  supabaseStorageList,
+  supabaseStoragePublicUrl,
+} from '@/lib/supabase'
 
 export interface MusicPlayerState {
   playlist: Track[]
@@ -18,7 +23,18 @@ export interface MusicPlayerState {
   setVolume: (vol: number) => void
 }
 
+interface SongRow {
+  id: string | number
+  title?: string
+  artist?: string
+  duration?: number
+  src: string
+  cover_label?: string
+}
+
 let sharedAudio: HTMLAudioElement | null = null
+let cachedSongsList: Track[] | null = null
+let songsFetched = false
 
 /**
  * Returns default start time (in seconds) for tracks that should skip an intro
@@ -59,34 +75,30 @@ function getTrackEndTime(track?: Partial<Track> | null): number {
 export function updateAudioListener(camX: number, camY: number, camZ: number) {
   if (!sharedAudio) return
 
-  // Distance between camera and physical music player on desk
   const dx = camX - 0.62
   const dy = camY - 0.88
   const dz = camZ - (-1.02)
   const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-  // Camera close-up is ~0.6m, default workspace is ~2.5m
-  // Smoothly adjust volume so it's noticeably louder and clearer up-close
-  // and softer at the default distance, giving a realistic room acoustic presence
   const currentBaseVol = Number(sharedAudio.dataset.baseVolume ?? 0.8)
   const distanceFactor = Math.max(0.45, Math.min(1.0, 1.25 / Math.max(0.7, dist)))
   sharedAudio.volume = Math.max(0, Math.min(1, currentBaseVol * distanceFactor))
 }
 
 export function useMusicPlayer(): MusicPlayerState {
-  const [playlist, setPlaylist] = useState<Track[]>(PLAYLIST)
+  const [playlist, setPlaylist] = useState<Track[]>(cachedSongsList || PLAYLIST)
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(PLAYLIST[0]?.duration || 10.8)
+  const [duration, setDuration] = useState((cachedSongsList || PLAYLIST)[0]?.duration || 10.8)
   const [volume, setVolumeState] = useState(0.8)
-  const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(isSupabaseConfigured)
+  const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(isSupabaseConfigured && !songsFetched)
 
   const currentTrack = playlist[currentTrackIndex] || PLAYLIST[0]
 
   // 1. Fetch songs from Supabase ('songs' table + 'Songs' storage bucket fallback)
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return
+    if (!isSupabaseConfigured || songsFetched) return
 
     let isMounted = true
 
@@ -94,11 +106,11 @@ export function useMusicPlayer(): MusicPlayerState {
       try {
         const collectedTracks: Track[] = []
 
-        // A. Query the 'songs' database table
-        const { data, error } = await supabase!
-          .from('songs')
-          .select('*')
-          .order('created_at', { ascending: false })
+        // A. Query the 'songs' database table via lightweight REST
+        const { data, error } = await supabaseRestSelect<SongRow>(
+          'songs',
+          'select=*&order=created_at.desc',
+        )
 
         if (!error && data && data.length > 0) {
           for (const item of data) {
@@ -119,15 +131,9 @@ export function useMusicPlayer(): MusicPlayerState {
           }
         }
 
-        // B. Also check Supabase Storage 'Songs' / 'songs' buckets for any uploaded audio files
-        //    (In case the user uploaded directly to Supabase Storage -> Songs bucket!)
+        // B. Also check Supabase Storage 'Songs' / 'songs' buckets for uploaded audio files
         for (const bucketName of ['Songs', 'songs']) {
-          const { data: bucketFiles, error: bucketError } = await supabase!.storage
-            .from(bucketName)
-            .list('', {
-              limit: 25,
-              sortBy: { column: 'created_at', order: 'desc' },
-            })
+          const { data: bucketFiles, error: bucketError } = await supabaseStorageList(bucketName, 25)
 
           if (!bucketError && bucketFiles && bucketFiles.length > 0) {
             for (const file of bucketFiles) {
@@ -139,21 +145,18 @@ export function useMusicPlayer(): MusicPlayerState {
                 continue
               }
 
-              const { data: pubData } = supabase!.storage
-                .from(bucketName)
-                .getPublicUrl(file.name)
-
-              const publicUrl = pubData?.publicUrl
+              const publicUrl = supabaseStoragePublicUrl(bucketName, file.name)
               if (!publicUrl) continue
 
-              // Skip if this file is already in the database table tracks
-              const alreadyExists = collectedTracks.some((t) =>
-                t.src.includes(encodeURIComponent(file.name)) || t.src.includes(file.name),
+              const alreadyExists = collectedTracks.some(
+                (t) => t.src.includes(encodeURIComponent(file.name)) || t.src.includes(file.name),
               )
               if (alreadyExists) continue
 
-              // Clean up filename into Title & Artist (e.g. "Dua Lipa - Love Again.mp3")
-              const baseName = file.name.replace(/\.(mp3|wav|ogg|m4a|flac|aac)$/i, '').replace(/_/g, ' ').trim()
+              const baseName = file.name
+                .replace(/\.(mp3|wav|ogg|m4a|flac|aac)$/i, '')
+                .replace(/_/g, ' ')
+                .trim()
               let parsedArtist = 'Dua Lipa'
               let parsedTitle = baseName
 
@@ -184,20 +187,23 @@ export function useMusicPlayer(): MusicPlayerState {
           }
         }
 
-        if (collectedTracks.length > 0 && isMounted) {
-          const firstStart = getTrackStartTime(collectedTracks[0])
-          const firstEnd = getTrackEndTime(collectedTracks[0])
-          setPlaylist(collectedTracks)
-          setCurrentTrackIndex(0)
-          setCurrentTime(firstStart)
-          if (firstEnd > 0) {
-            setDuration(firstEnd)
-          }
-          if (sharedAudio) {
-            sharedAudio.src = collectedTracks[0].src
-            sharedAudio.dataset.startTime = String(firstStart)
-            sharedAudio.dataset.endTime = String(firstEnd)
-            sharedAudio.load()
+        songsFetched = true
+        if (collectedTracks.length > 0) {
+          cachedSongsList = collectedTracks
+          if (isMounted) {
+            const firstStart = getTrackStartTime(collectedTracks[0])
+            const firstEnd = getTrackEndTime(collectedTracks[0])
+            setPlaylist(collectedTracks)
+            setCurrentTrackIndex(0)
+            setCurrentTime(firstStart)
+            if (firstEnd > 0) {
+              setDuration(firstEnd)
+            }
+            if (sharedAudio) {
+              sharedAudio.src = collectedTracks[0].src
+              sharedAudio.dataset.startTime = String(firstStart)
+              sharedAudio.dataset.endTime = String(firstEnd)
+            }
           }
         }
       } catch (err) {
@@ -209,31 +215,18 @@ export function useMusicPlayer(): MusicPlayerState {
 
     fetchSongs()
 
-    // C. Realtime subscription so changes in the Supabase 'songs' table update live
-    const channel = supabase
-      .channel('public:songs')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'songs' },
-        () => {
-          fetchSongs()
-        },
-      )
-      .subscribe()
-
     return () => {
       isMounted = false
-      supabase?.removeChannel(channel)
     }
   }, [])
 
-  // 2. Initialize shared audio element once
+  // 2. Initialize shared audio element once (with preload="metadata" so 1.4MB WAV files aren't downloaded until user clicks Play!)
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     if (!sharedAudio) {
       sharedAudio = new Audio()
-      sharedAudio.preload = 'auto'
+      sharedAudio.preload = 'none'
       sharedAudio.dataset.baseVolume = '0.8'
     }
 
@@ -317,24 +310,22 @@ export function useMusicPlayer(): MusicPlayerState {
       setDuration(endCutoff)
     }
 
-    if (audio.src !== currentTrack.src) {
+    if (audio.src !== currentTrack.src && wasPlaying) {
       audio.src = currentTrack.src
       audio.currentTime = startOffset
       setCurrentTime(startOffset)
 
-      if (wasPlaying) {
-        audio
-          .play()
-          .then(() => {
-            if (startOffset > 0 && audio.currentTime < startOffset - 0.5) {
-              audio.currentTime = startOffset
-            }
-          })
-          .catch((err) => {
-            console.warn('Audio play error:', err)
-            setIsPlaying(false)
-          })
-      }
+      audio
+        .play()
+        .then(() => {
+          if (startOffset > 0 && audio.currentTime < startOffset - 0.5) {
+            audio.currentTime = startOffset
+          }
+        })
+        .catch((err) => {
+          console.warn('Audio play error:', err)
+          setIsPlaying(false)
+        })
     }
   }, [currentTrack, currentTrack?.src, currentTrackIndex, isPlaying])
 

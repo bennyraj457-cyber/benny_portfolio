@@ -35,11 +35,9 @@ export const CONTACT_CONTENT: ContactContentConfig = {
       id: 'email',
       label: 'Email',
       value: 'benny457@gmail.com',
-      href: 'mailto:[YOUR EMAIL]',
+      href: 'mailto:benny457@gmail.com',
     },
-
   ],
   ctaLabel: 'Get in Touch',
-  ctaHref: 'mailto:[YOUR EMAIL]?subject=Project%20Inquiry',
+  ctaHref: 'mailto:benny457@gmail.com?subject=Project%20Inquiry',
 }
-

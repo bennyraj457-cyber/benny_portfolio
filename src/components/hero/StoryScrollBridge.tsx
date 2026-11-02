@@ -5,15 +5,18 @@ import { useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
 import { STORY_STEPS, type StoryStepId } from '@/data/storySteps'
 
 /**
- * Synchronizes discrete story steps with 3D room entrance and object focus states:
- * Step 0 ('door'): Exit back to door view
- * Step 1 ('room-overview'): Inside room, overview camera
- * Step 2 ('notebook'): Opens About Me notebook
- * Step 3 ('bookshelf'): Opens Skills bookshelf
- * Step 4 ('music-player'): Opens Vintage Gramophone music player
- * Step 5 ('smartphone'): Opens Contact smartphone
- * Step 6 ('wall-art'): Focuses Framed Wall Art gallery
- * Step 7 ('wall-note'): Focuses Studio Notice wall note
+ * Synchronizes discrete story steps (driven by page scroll or HUD buttons)
+ * with 3D room entrance and object focus states:
+ * Step 0 ('door'): Entrance Door view
+ * Step 1 ('room-overview'): Opens door and glides inside room to overview camera
+ * Step 2 ('bike-showroom'): Focuses 1970 Honda CB750 & Left Glass Patio Door
+ * Step 3 ('notebook'): Opens About Me notebook
+ * Step 4 ('bookshelf'): Opens Skills bookshelf
+ * Step 5 ('music-player'): Opens Vintage Gramophone music player
+ * Step 6 ('smartphone'): Opens Contact smartphone
+ * Step 7 ('wall-art'): Focuses Framed Wall Art gallery
+ * Step 8 ('wall-note'): Focuses Studio Notice wall note
+ * Step 9 ('door-exit'): Exits room back through the door to the outside wall door before scrolling to Footer
  */
 export function StoryScrollBridge() {
   const { currentStep, currentStepIndex, goToStep } = useStoryScroll()
@@ -30,23 +33,26 @@ export function StoryScrollBridge() {
     returnToWorkspace,
   } = useWorkspaceFocus()
 
-  const lastDrivenStepRef = useRef<StoryStepId>(currentStep.id)
+  const isProgrammaticStepRef = useRef(false)
 
-  // 1. When currentStep changes via Next/Prev/Dot click, drive the 3D scene
+  // 1. When currentStep changes via page scroll or Next/Prev/Dot click, drive the 3D scene
   useEffect(() => {
     const stepId = currentStep.id
-    lastDrivenStepRef.current = stepId
+    isProgrammaticStepRef.current = true
+    const timer = setTimeout(() => {
+      isProgrammaticStepRef.current = false
+    }, 350)
 
-    if (stepId === 'door') {
+    if (stepId === 'door' || stepId === 'door-exit') {
       returnToWorkspace()
       if (stage !== 'ENTRANCE' && stage !== 'EXITING_ROOM') {
         exitToDoor()
       }
-      return
+      return () => clearTimeout(timer)
     }
 
-    // For all steps beyond the door: if currently at door entrance, trigger entrance
-    if (stage === 'ENTRANCE') {
+    // For all interior steps: if currently at door entrance or exiting, open the door and enter
+    if (stage === 'ENTRANCE' || stage === 'EXITING_ROOM') {
       handleDoorClick()
     }
 
@@ -67,18 +73,22 @@ export function StoryScrollBridge() {
     } else if (stepId === 'wall-note') {
       openWallNote()
     }
+
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep.id])
 
-  // 2. When user manually clicks the 3D door or interactive 3D objects, sync the step index so Next/Prev stay in order
+  // 2. When user manually clicks a 3D object or door directly inside the canvas, keep the step indicator synced
   useEffect(() => {
-    if (stage === 'DOOR_OPENING' && currentStep.id === 'door') {
+    if (isProgrammaticStepRef.current) return
+
+    if (stage === 'DOOR_OPENING' && (currentStep.id === 'door' || currentStep.id === 'door-exit')) {
       const overviewIdx = STORY_STEPS.findIndex((s) => s.id === 'room-overview')
       if (overviewIdx !== -1) goToStep(overviewIdx)
       return
     }
 
-    if (stage === 'EXITING_ROOM' && currentStep.id !== 'door') {
+    if (stage === 'EXITING_ROOM' && currentStep.id !== 'door' && currentStep.id !== 'door-exit') {
       goToStep(0)
       return
     }
@@ -105,4 +115,3 @@ export function StoryScrollBridge() {
 
   return null
 }
-

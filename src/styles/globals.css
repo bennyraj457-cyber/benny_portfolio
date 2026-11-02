@@ -104,7 +104,7 @@
     line-height: 1.625rem;
     letter-spacing: 0em;
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 }
 
@@ -227,4 +227,3 @@
     @apply flex flex-wrap items-center gap-space-md rounded-full bg-surface-container-low px-space-md py-space-sm font-mono text-label-metric text-on-surface-variant border border-outline-variant/40;
   }
 }
-

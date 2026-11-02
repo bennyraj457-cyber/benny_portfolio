@@ -8,6 +8,7 @@ export type StoryStepId =
   | 'smartphone'
   | 'wall-art'
   | 'wall-note'
+  | 'door-exit'
 
 export interface StoryStep {
   id: StoryStepId
@@ -25,7 +26,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Studio Entrance',
     subtitle: 'Private Lab & Workspace 01',
     category: 'STUDIO ENTRANCE',
-    hint: 'Click Next or the door handle to enter the room',
+    hint: 'Scroll down or click the door handle to enter the room',
   },
   {
     id: 'room-overview',
@@ -33,7 +34,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Creative Studio',
     subtitle: '3D Workspace & Design Lab',
     category: 'OVERVIEW',
-    hint: 'Click Next to tour each station or click any object',
+    hint: 'Scroll down to tour each station or click any object',
   },
   {
     id: 'bike-showroom',
@@ -41,7 +42,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: '1970 Honda CB750 & Glass Patio',
     subtitle: 'Classic Super Sport & Sunlight Terrace Door',
     category: 'GARAGE SHOWCASE',
-    hint: 'Click the glass door to open/close or click Next',
+    hint: 'Scroll down to continue or click the glass door to slide open',
   },
   {
     id: 'notebook',
@@ -49,7 +50,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'About Me Notebook',
     subtitle: 'Creative Developer & UI/UX Designer',
     category: 'BIOGRAPHY & PHILOSOPHY',
-    hint: 'Flip pages or click Next to continue',
+    hint: 'Scroll down to explore Skills & Tech Stack',
   },
   {
     id: 'bookshelf',
@@ -57,7 +58,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Skills & Tech Stack',
     subtitle: 'React • Three.js • TypeScript • UI/UX',
     category: 'KNOWLEDGE & CAPABILITIES',
-    hint: 'Click any book to read or click Next',
+    hint: 'Click any book to read or scroll down to continue',
   },
   {
     id: 'music-player',
@@ -65,7 +66,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Vintage Gramophone',
     subtitle: 'Soundtrack & Ambient Audio',
     category: 'AUDIO & AMBIENCE',
-    hint: 'Play songs or click Next to continue',
+    hint: 'Play vinyl tracks or scroll down to continue',
   },
   {
     id: 'smartphone',
@@ -73,7 +74,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: "Let's Connect",
     subtitle: 'Direct Messaging & Social Links',
     category: 'COMMUNICATION',
-    hint: 'Send a message or click Next to continue',
+    hint: 'Tap a channel on the phone or scroll down to continue',
   },
   {
     id: 'wall-art',
@@ -81,7 +82,7 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Framed Gallery Art',
     subtitle: 'Live Artwork from Supabase',
     category: 'EXHIBITION',
-    hint: 'Click Next to view notice or Prev to go back',
+    hint: 'Scroll down to view the Studio Notice Board',
   },
   {
     id: 'wall-note',
@@ -89,7 +90,14 @@ export const STORY_STEPS: StoryStep[] = [
     title: 'Studio Notice',
     subtitle: 'Workspace Expansion & Updates',
     category: 'NOTICE BOARD',
-    hint: 'Click Next to restart tour or Prev to go back',
+    hint: 'Scroll down to return to the studio door & exit',
+  },
+  {
+    id: 'door-exit',
+    stepNumber: 10,
+    title: 'Studio Exit',
+    subtitle: 'Returning to the Entrance Door',
+    category: 'DEPARTURE',
+    hint: 'Scroll down to exit the 3D studio to the footer',
   },
 ]
-

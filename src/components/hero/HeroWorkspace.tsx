@@ -2,17 +2,16 @@ import { WorkspaceCanvas } from './WorkspaceCanvas'
 
 interface HeroWorkspaceProps {
   onBackToHome?: () => void
+  onSceneReady?: () => void
 }
 
-export function HeroWorkspace({ onBackToHome }: HeroWorkspaceProps) {
+export function HeroWorkspace({ onBackToHome, onSceneReady }: HeroWorkspaceProps) {
   return (
     <section
-      aria-label="3D Creative Workspace Hero"
-      className="relative w-full h-screen bg-surface overflow-hidden"
+      aria-label="3D Creative Workspace Scroll Tour"
+      className="relative w-full bg-surface"
     >
-      <div className="absolute inset-0">
-        <WorkspaceCanvas onBackToHome={onBackToHome} />
-      </div>
+      <WorkspaceCanvas onBackToHome={onBackToHome} onSceneReady={onSceneReady} />
     </section>
   )
 }

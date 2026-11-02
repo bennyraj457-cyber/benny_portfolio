@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import {
+  isSupabaseConfigured,
+  supabaseRestSelect,
+  supabaseStorageList,
+  supabaseStoragePublicUrl,
+} from '@/lib/supabase'
 
 export interface WallArtData {
   imageUrl: string | null
@@ -7,56 +12,81 @@ export interface WallArtData {
   isLoading: boolean
 }
 
+interface WallArtRow {
+  image_url?: string
+  title?: string
+  is_active?: boolean
+}
+
+// Module-level session cache so repeated renders never re-fetch
+let cachedWallArt: { imageUrl: string | null; title: string; fetched: boolean } = {
+  imageUrl: null,
+  title: 'Geometric Study',
+  fetched: false,
+}
+
 /**
- * Fetches active wall art image from Supabase 'wall_art' table or 'gallery' / 'artwork' bucket.
+ * Fetches active wall art image from Supabase 'wall_art' table or 'gallery' bucket.
  * Falls back gracefully to the clean default artwork if offline or not configured.
  */
 export function useWallArt(): WallArtData {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [title, setTitle] = useState<string>('Geometric Study')
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedWallArt.imageUrl)
+  const [title, setTitle] = useState<string>(cachedWallArt.title)
+  const [isLoading, setIsLoading] = useState<boolean>(!cachedWallArt.fetched)
 
   useEffect(() => {
+    if (cachedWallArt.fetched) {
+      setImageUrl(cachedWallArt.imageUrl)
+      setTitle(cachedWallArt.title)
+      setIsLoading(false)
+      return
+    }
+
     let isMounted = true
 
     async function fetchWallArt() {
-      if (!isSupabaseConfigured || !supabase) {
+      if (!isSupabaseConfigured) {
+        cachedWallArt.fetched = true
         if (isMounted) setIsLoading(false)
         return
       }
 
       try {
         // 1. Try querying the 'wall_art' table for active artwork
-        const { data, error } = await supabase
-          .from('wall_art')
-          .select('image_url, title, is_active')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
+        const { data, error } = await supabaseRestSelect<WallArtRow>(
+          'wall_art',
+          'select=image_url,title,is_active&is_active=eq.true&order=created_at.desc&limit=1',
+        )
 
         if (!error && data && data.length > 0 && data[0].image_url) {
+          cachedWallArt = {
+            imageUrl: data[0].image_url,
+            title: data[0].title || 'Geometric Study',
+            fetched: true,
+          }
           if (isMounted) {
-            setImageUrl(data[0].image_url)
-            if (data[0].title) setTitle(data[0].title)
+            setImageUrl(cachedWallArt.imageUrl)
+            setTitle(cachedWallArt.title)
             setIsLoading(false)
           }
           return
         }
 
-        // 2. Alternatively check for an image in 'gallery' or 'artwork' storage bucket
-        const { data: bucketFiles } = await supabase.storage.from('gallery').list('', {
-          limit: 1,
-          sortBy: { column: 'created_at', order: 'desc' },
-        })
+        // 2. Alternatively check for an image in 'gallery' storage bucket
+        const { data: bucketFiles } = await supabaseStorageList('gallery', 1)
 
         if (bucketFiles && bucketFiles.length > 0 && bucketFiles[0].name) {
-          const { data: publicUrlData } = supabase.storage
-            .from('gallery')
-            .getPublicUrl(bucketFiles[0].name)
-
-          if (publicUrlData?.publicUrl && isMounted) {
-            setImageUrl(publicUrlData.publicUrl)
-            setIsLoading(false)
+          const publicUrl = supabaseStoragePublicUrl('gallery', bucketFiles[0].name)
+          if (publicUrl) {
+            cachedWallArt = {
+              imageUrl: publicUrl,
+              title: 'Geometric Study',
+              fetched: true,
+            }
+            if (isMounted) {
+              setImageUrl(publicUrl)
+              setIsLoading(false)
+            }
             return
           }
         }
@@ -64,6 +94,7 @@ export function useWallArt(): WallArtData {
         // Fallback gracefully
       }
 
+      cachedWallArt.fetched = true
       if (isMounted) {
         setIsLoading(false)
       }
