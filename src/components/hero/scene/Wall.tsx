@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import * as THREE from 'three'
 import { InteractiveBookshelf } from './InteractiveBookshelf'
 import { PinnedWallNote } from './PinnedWallNote'
 import { FramedWallArt } from './FramedWallArt'
@@ -7,10 +9,32 @@ const SLAT_POSITIONS = [
 ]
 
 export function Wall() {
+  // Single InstancedMesh for the 10 vertical wall slats
+  const slatsInstanced = useMemo(() => {
+    const geom = new THREE.BoxGeometry(0.06, 3.5, 0.04)
+    const mat = new THREE.MeshStandardMaterial({
+      color: '#dcdad4',
+      roughness: 0.7,
+      metalness: 0.06,
+    })
+    const mesh = new THREE.InstancedMesh(geom, mat, SLAT_POSITIONS.length)
+    mesh.receiveShadow = true
+    mesh.raycast = () => null
+
+    const dummy = new THREE.Object3D()
+    SLAT_POSITIONS.forEach((x, idx) => {
+      dummy.position.set(x, 0, 0)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(idx, dummy.matrix)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    return mesh
+  }, [])
+
   return (
     <group name="Wall">
       {/* Main Back Wall - Warm Plaster / Archival Surface */}
-      <mesh position={[0, 2.2, -1.45]} receiveShadow>
+      <mesh position={[0, 2.2, -1.45]} receiveShadow raycast={() => null}>
         <boxGeometry args={[10, 4.6, 0.12]} />
         <meshStandardMaterial
           color="#f0eee8"
@@ -20,7 +44,7 @@ export function Wall() {
       </mesh>
 
       {/* Architectural Baseboard / Skirting Board */}
-      <mesh position={[0, 0.06, -1.38]} receiveShadow castShadow>
+      <mesh position={[0, 0.06, -1.38]} receiveShadow raycast={() => null}>
         <boxGeometry args={[10, 0.12, 0.03]} />
         <meshStandardMaterial
           color="#fbf9f3"
@@ -30,7 +54,7 @@ export function Wall() {
       </mesh>
 
       {/* Recessed Architectural Wall Panel Behind Desk */}
-      <mesh position={[0, 1.65, -1.385]} receiveShadow>
+      <mesh position={[0, 1.65, -1.385]} receiveShadow raycast={() => null}>
         <boxGeometry args={[2.5, 2.5, 0.015]} />
         <meshStandardMaterial
           color="#eae8e2"
@@ -39,18 +63,9 @@ export function Wall() {
         />
       </mesh>
 
-      {/* Left Architectural Vertical Fluted Slat Paneling */}
+      {/* Left Architectural Vertical Fluted Slat Paneling (Single InstancedMesh) */}
       <group position={[0, 1.75, -1.37]}>
-        {SLAT_POSITIONS.map((x) => (
-          <mesh key={x} position={[x, 0, 0]} castShadow receiveShadow>
-            <boxGeometry args={[0.06, 3.5, 0.04]} />
-            <meshStandardMaterial
-              color="#dcdad4"
-              roughness={0.7}
-              metalness={0.06}
-            />
-          </mesh>
-        ))}
+        <primitive object={slatsInstanced} />
       </group>
 
       {/* Dynamic Framed Wall Art (Supabase Connected) */}

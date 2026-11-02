@@ -5,19 +5,17 @@ import { useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
 import { InteractiveObjectBeacon } from './InteractiveObjectBeacon'
 
 /**
- * Creates ultra-sharp high-DPI paper texture for a realistic architectural pinned memo note.
- * Notice:
- * "ROOM UNDER CONSTRUCTION
- *  .
- *  STAY TUNED. SOMETHING EXCITING IS TAKING SHAPE."
+ * Creates sharp paper texture for a realistic architectural pinned memo note.
  */
 function createPinnedNoteTexture(): THREE.CanvasTexture {
   const width = 1024
   const height = 1024
+  const scale = 0.5 // 512x512 physical texture (4x fewer pixels)
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
   const ctx = canvas.getContext('2d')!
+  ctx.scale(scale, scale)
 
   // 1. Warm cream stationery paper background (#faf7eb)
   ctx.fillStyle = '#faf7eb'
@@ -33,7 +31,7 @@ function createPinnedNoteTexture(): THREE.CanvasTexture {
 
   // 3. Realistic paper fibers
   ctx.fillStyle = 'rgba(60, 48, 25, 0.035)'
-  for (let i = 0; i < 600; i++) {
+  for (let i = 0; i < 150; i++) {
     const rx = Math.random() * width
     const ry = Math.random() * height
     ctx.fillRect(rx, ry, Math.random() * 5 + 1, 1.5)
@@ -143,7 +141,8 @@ function createPinnedNoteTexture(): THREE.CanvasTexture {
   texture.colorSpace = THREE.SRGBColorSpace
   texture.minFilter = THREE.LinearFilter
   texture.magFilter = THREE.LinearFilter
-  texture.anisotropy = 8
+  texture.generateMipmaps = false
+  texture.anisotropy = 4
   texture.needsUpdate = true
   return texture
 }
@@ -155,11 +154,6 @@ export interface PinnedWallNoteProps {
   rotation?: [number, number, number]
 }
 
-/**
- * 3D Physical Pinned Note on the Wall with a metallic push pin, cast shadow,
- * high-contrast readable typography directly on the front plane face,
- * and click-to-focus interactive camera zoom.
- */
 export function PinnedWallNote({
   position = [0.78, 1.84, -1.37],
   rotation = [0, 0, 0.045],
@@ -171,7 +165,6 @@ export function PinnedWallNote({
 
   const noteTexture = useMemo(() => createPinnedNoteTexture(), [])
 
-  // Note dimensions: 25cm x 25cm
   const noteW = 0.25
   const noteH = 0.25
 
@@ -209,10 +202,9 @@ export function PinnedWallNote({
     [isWallNoteOpen, openWallNote],
   )
 
-  // Subtle interactive hover highlight animation
   useFrame((_, delta) => {
     const target = isHovered && !isWallNoteOpen ? 1 : 0
-    if (target === 0 && hoverAnimRef.current < 0.001) return
+    if (Math.abs(hoverAnimRef.current - target) < 0.001) return
     const dt = Math.min(delta, 0.1)
     hoverAnimRef.current += (target - hoverAnimRef.current) * (1 - Math.exp(-12 * dt))
     if (highlightMatRef.current) {
@@ -236,12 +228,12 @@ export function PinnedWallNote({
       </mesh>
 
       {/* 2. Paper Backing Cardstock for physical 3D depth */}
-      <mesh position={[0, 0, -0.0005]} castShadow receiveShadow>
+      <mesh position={[0, 0, -0.0005]} receiveShadow raycast={() => null}>
         <boxGeometry args={[noteW, noteH, 0.001]} />
         <meshStandardMaterial color="#f0ece0" roughness={0.9} metalness={0.05} />
       </mesh>
 
-      {/* 3. Dedicated Front Printed Note Face */}
+      {/* 3. Dedicated Front Printed Note Face (Single hit target for note) */}
       <mesh position={[0, 0, 0.0006]}>
         <planeGeometry args={[noteW, noteH]} />
         <meshBasicMaterial
@@ -263,7 +255,7 @@ export function PinnedWallNote({
         />
       </mesh>
 
-      {/* 5. Slightly Lifted Bottom Right Corner for realistic paper flex */}
+      {/* 5. Slightly Lifted Bottom Right Corner */}
       <mesh position={[noteW * 0.4, -noteH * 0.4, 0.002]} rotation={[-0.05, 0.08, -0.03]} raycast={() => null}>
         <planeGeometry args={[0.048, 0.048]} />
         <meshBasicMaterial
@@ -272,17 +264,15 @@ export function PinnedWallNote({
         />
       </mesh>
 
-      {/* 6. Realistic Push Pin at Top Center holding the note to the wall */}
+      {/* 6. Realistic Push Pin at Top Center */}
       <group position={[0, noteH * 0.44, 0.003]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
-        {/* Needle Pin Shaft going into the wall */}
         <mesh position={[0, 0, -0.008]}>
-          <cylinderGeometry args={[0.0012, 0.0012, 0.018, 12]} />
+          <cylinderGeometry args={[0.0012, 0.0012, 0.018, 8]} />
           <meshStandardMaterial color="#d4d4d4" metalness={0.95} roughness={0.15} />
         </mesh>
 
-        {/* Pin Head Base Collar */}
         <mesh position={[0, 0, 0.002]}>
-          <cylinderGeometry args={[0.007, 0.007, 0.0035, 16]} />
+          <cylinderGeometry args={[0.007, 0.007, 0.0035, 12]} />
           <meshStandardMaterial
             color="#f5d000"
             metalness={0.2}
@@ -290,9 +280,8 @@ export function PinnedWallNote({
           />
         </mesh>
 
-        {/* Pin Head Body (Electric-Yellow Sculpted Plastic Push Pin) */}
         <mesh position={[0, 0, 0.009]}>
-          <cylinderGeometry args={[0.005, 0.007, 0.011, 16]} />
+          <cylinderGeometry args={[0.005, 0.007, 0.011, 12]} />
           <meshStandardMaterial
             color="#f5d000"
             metalness={0.15}
@@ -300,9 +289,8 @@ export function PinnedWallNote({
           />
         </mesh>
 
-        {/* Pin Head Top Cap Dome */}
         <mesh position={[0, 0, 0.015]}>
-          <sphereGeometry args={[0.006, 16, 12]} />
+          <sphereGeometry args={[0.006, 12, 8]} />
           <meshStandardMaterial
             color="#f5d000"
             metalness={0.15}

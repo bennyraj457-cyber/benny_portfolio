@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useGLTF, useTexture } from '@react-three/drei'
 import { ABOUT_ME_CONTENT } from '@/data/aboutMeContent'
 import { entranceAudio } from '@/utils/entranceAudio'
 
@@ -8,6 +9,20 @@ interface HomePageProps {
 
 export function HomePage({ onEnter }: HomePageProps) {
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  // Warm up 3D models and textures in the background while the user views the Home page
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        useGLTF.preload('/models/tall_house_plant.glb')
+        useGLTF.preload('/models/honda_cb_750_f_super_sport_1970.glb')
+        useTexture.preload('/textures/mountain-lake-view.jpg')
+      } catch {
+        // Ignore preload errors
+      }
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleEnterClick = () => {
     // Play subtle entrance click/audio
@@ -20,7 +35,7 @@ export function HomePage({ onEnter }: HomePageProps) {
     setIsTransitioning(true)
     setTimeout(() => {
       onEnter()
-    }, 450)
+    }, 350)
   }
 
   return (
@@ -74,7 +89,7 @@ export function HomePage({ onEnter }: HomePageProps) {
 
         {/* Headline */}
         <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-semibold tracking-tight text-[#fbf9f3] max-w-3xl leading-[1.1] mb-6">
-          Designing Digital <span className="italic text-[#f5d000]">Experiences</span> Through Space & Code.
+          Designing Digital <span className="italic text-[#f5d000]">Experiences</span> Through Space &amp; Code.
         </h1>
 
         {/* Subtitle / Bio snippet */}
@@ -108,7 +123,7 @@ export function HomePage({ onEnter }: HomePageProps) {
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/5 border border-white/5">
             <span className="text-[#439d8e]">✦</span>
-            <span>1970 CB750 & Patio</span>
+            <span>1970 CB750 &amp; Patio</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/5 border border-white/5">
             <span className="text-[#f5d000]">✦</span>
@@ -125,7 +140,7 @@ export function HomePage({ onEnter }: HomePageProps) {
       <footer className="relative z-10 w-full max-w-6xl mx-auto px-6 sm:px-10 py-6 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-[#71717a] border-t border-white/5 gap-3">
         <div>© {new Date().getFullYear()} Benny R. All rights reserved.</div>
         <div className="flex items-center gap-4">
-          <span>Crafted with Three.js & React</span>
+          <span>Crafted with Three.js &amp; React</span>
         </div>
       </footer>
     </div>

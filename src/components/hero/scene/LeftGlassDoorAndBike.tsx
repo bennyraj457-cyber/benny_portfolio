@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
+import { Suspense, useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { RoundedBox, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -13,6 +13,7 @@ const OUTDOOR_VIEW_TEXTURE = '/textures/mountain-lake-view.jpg'
 /**
  * Loads and renders the 1970 Honda CB750 F Super Sport GLB model
  * inside the left side of the room on a sleek architectural showroom plinth.
+ * Uses a single lightweight 12-triangle bounding box proxy for instant CPU raycasting!
  */
 function HondaBikeModel({
   onHover,
@@ -28,8 +29,10 @@ function HondaBikeModel({
     clonedScene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
-        mesh.castShadow = true
-        mesh.receiveShadow = true
+        // Disable expensive 36k-triangle shadow casting & CPU raycasting on individual sub-meshes
+        mesh.castShadow = false
+        mesh.receiveShadow = false
+        mesh.raycast = () => null
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshStandardMaterial
           mat.envMapIntensity = 1.25
@@ -61,16 +64,57 @@ function HondaBikeModel({
       position={[0, 0.024, 0]}
       rotation={[0, 0.42, 0]}
       scale={[0.88, 0.88, 0.88]}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-      onClick={onClick}
     >
+      {/* Visual 36k-triangle model with raycast disabled */}
       <primitive object={clonedScene} />
+
+      {/* Ultra-fast 12-triangle invisible hit-box proxy for hover & click */}
+      <mesh
+        position={[0, 0.58, 0]}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+        onClick={onClick}
+      >
+        <boxGeometry args={[0.85, 1.15, 2.05]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+      </mesh>
     </group>
   )
 }
 
 useGLTF.preload(BIKE_MODEL_PATH)
+
+/**
+ * Outdoor panoramic mountain-lake backdrop loaded inside its own Suspense boundary
+ */
+function OutdoorMountainBackdrop({
+  skyBackdropMatRef,
+}: {
+  skyBackdropMatRef: React.RefObject<THREE.MeshBasicMaterial | null>
+}) {
+  const outdoorTexture = useTexture(OUTDOOR_VIEW_TEXTURE)
+  useMemo(() => {
+    outdoorTexture.colorSpace = THREE.SRGBColorSpace
+    outdoorTexture.minFilter = THREE.LinearFilter
+    outdoorTexture.magFilter = THREE.LinearFilter
+    outdoorTexture.generateMipmaps = false
+    outdoorTexture.needsUpdate = true
+  }, [outdoorTexture])
+
+  return (
+    <mesh position={[-2.05, 1.65, 0]} rotation={[0, Math.PI / 2, 0]} raycast={() => null}>
+      <planeGeometry args={[6.8, 4.4]} />
+      <meshBasicMaterial
+        ref={skyBackdropMatRef}
+        map={outdoorTexture}
+        color="#ffffff"
+        fog={false}
+        toneMapped={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  )
+}
 
 /**
  * Left Side Room Extension:
@@ -92,15 +136,6 @@ export function LeftGlassDoorAndBike() {
   const [isDoorHovered, setIsDoorHovered] = useState(false)
   const [isBikeHovered, setIsBikeHovered] = useState(false)
 
-  // Load outdoor mountain-lake backdrop texture via useTexture so it binds cleanly
-  const outdoorTexture = useTexture(OUTDOOR_VIEW_TEXTURE)
-  useMemo(() => {
-    outdoorTexture.colorSpace = THREE.SRGBColorSpace
-    outdoorTexture.minFilter = THREE.LinearFilter
-    outdoorTexture.magFilter = THREE.LinearFilter
-    outdoorTexture.needsUpdate = true
-  }, [outdoorTexture])
-
   // Animation refs
   const doorSlideRef = useRef(0) // 0 = closed, 1 = open
   const slidingLeafGroupRef = useRef<THREE.Group>(null)
@@ -110,7 +145,6 @@ export function LeftGlassDoorAndBike() {
   const bikeSpotLightRef = useRef<THREE.SpotLight>(null)
   const sunTargetObj = useMemo(() => {
     const obj = new THREE.Object3D()
-    // Aim sunlight from the left side window deep across the bike, desk, chair, and studio floor
     obj.position.set(-0.35, 0.35, -0.35)
     return obj
   }, [])
@@ -118,6 +152,12 @@ export function LeftGlassDoorAndBike() {
   const sunBeamMat1Ref = useRef<THREE.ShaderMaterial>(null)
   const sunBeamMat2Ref = useRef<THREE.ShaderMaterial>(null)
   const skyBackdropMatRef = useRef<THREE.MeshBasicMaterial>(null)
+
+  // Pre-allocated color objects (zero per-frame GC allocations)
+  const nightSunColor = useMemo(() => new THREE.Color('#4a6b9c'), [])
+  const daySunColor = useMemo(() => new THREE.Color('#ffbc75'), [])
+  const nightSkyColor = useMemo(() => new THREE.Color('#1b263b'), [])
+  const daySkyColor = useMemo(() => new THREE.Color('#ffffff'), [])
 
   const toggleGlassDoor = useCallback(
     (e?: ThreeEvent<MouseEvent> | React.MouseEvent) => {
@@ -198,12 +238,12 @@ export function LeftGlassDoorAndBike() {
 
     // 1. Smoothly slide the movable glass door leaf along Z axis (opens by sliding back 1.32m)
     const targetSlide = isDoorOpen ? 1 : 0
-    doorSlideRef.current = THREE.MathUtils.damp(doorSlideRef.current, targetSlide, 3.8, dt)
-
-    if (slidingLeafGroupRef.current) {
-      // Slides smoothly toward the rear fixed panel (-Z) and slightly inset (-X) like a real lift-and-slide patio door
-      slidingLeafGroupRef.current.position.z = 0.68 - doorSlideRef.current * 1.32
-      slidingLeafGroupRef.current.position.x = -doorSlideRef.current * 0.045
+    if (Math.abs(doorSlideRef.current - targetSlide) > 0.0005) {
+      doorSlideRef.current = THREE.MathUtils.damp(doorSlideRef.current, targetSlide, 3.8, dt)
+      if (slidingLeafGroupRef.current) {
+        slidingLeafGroupRef.current.position.z = 0.68 - doorSlideRef.current * 1.32
+        slidingLeafGroupRef.current.position.x = -doorSlideRef.current * 0.045
+      }
     }
 
     // 2. Pulse handle indicator
@@ -213,79 +253,91 @@ export function LeftGlassDoorAndBike() {
     }
 
     // 3. Strong Daytime Sunlight streaming through the left glass door into the entire room
-    //    (All indoor artificial lights are OFF in daytime; bike overhead spotlight only turns ON at night)
     const daySunBase = isNightMode ? 0.08 : 3.25
     const openBoost = isNightMode ? 0.04 : doorSlideRef.current * 1.15
     const targetSunIntensity = daySunBase + openBoost
 
     if (sunDirLightRef.current) {
-      sunDirLightRef.current.intensity = THREE.MathUtils.damp(
-        sunDirLightRef.current.intensity,
-        targetSunIntensity,
-        4.0,
-        dt,
-      )
-      sunDirLightRef.current.color.lerp(
-        new THREE.Color(isNightMode ? '#4a6b9c' : '#ffbc75'),
-        dt * 4,
-      )
+      if (Math.abs(sunDirLightRef.current.intensity - targetSunIntensity) > 0.002) {
+        sunDirLightRef.current.intensity = THREE.MathUtils.damp(
+          sunDirLightRef.current.intensity,
+          targetSunIntensity,
+          4.0,
+          dt,
+        )
+        sunDirLightRef.current.color.lerp(
+          isNightMode ? nightSunColor : daySunColor,
+          dt * 4,
+        )
+      }
     }
 
     // Warm sunlight bounce fill inside the room from the sunlit floor (daytime only)
     if (sunBounceLightRef.current) {
       const targetBounce = isNightMode ? 0.0 : 1.55 + doorSlideRef.current * 0.6
-      sunBounceLightRef.current.intensity = THREE.MathUtils.damp(
-        sunBounceLightRef.current.intensity,
-        targetBounce,
-        4.0,
-        dt,
-      )
+      if (Math.abs(sunBounceLightRef.current.intensity - targetBounce) > 0.002) {
+        sunBounceLightRef.current.intensity = THREE.MathUtils.damp(
+          sunBounceLightRef.current.intensity,
+          targetBounce,
+          4.0,
+          dt,
+        )
+      }
     }
 
     // Overhead bike spotlight is switched OFF in daytime and ON in night mode
     if (bikeSpotLightRef.current) {
       const targetBikeSpot = isNightMode ? 2.2 : 0.0
-      bikeSpotLightRef.current.intensity = THREE.MathUtils.damp(
-        bikeSpotLightRef.current.intensity,
-        targetBikeSpot,
-        4.0,
-        dt,
-      )
+      if (Math.abs(bikeSpotLightRef.current.intensity - targetBikeSpot) > 0.002) {
+        bikeSpotLightRef.current.intensity = THREE.MathUtils.damp(
+          bikeSpotLightRef.current.intensity,
+          targetBikeSpot,
+          4.0,
+          dt,
+        )
+      }
     }
 
     // 4. Volumetric sunlight beams & floor patch visibility (daytime only, with feather-soft edges)
     const targetPatchOpacity = isNightMode ? 0.0 : 0.34 + doorSlideRef.current * 0.16
     if (sunFloorPatchMatRef.current) {
-      sunFloorPatchMatRef.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
-        sunFloorPatchMatRef.current.uniforms.uOpacity.value,
-        targetPatchOpacity,
-        4.0,
-        dt,
-      )
-      sunFloorPatchMatRef.current.uniforms.uOpenFactor.value = doorSlideRef.current
+      if (Math.abs(sunFloorPatchMatRef.current.uniforms.uOpacity.value - targetPatchOpacity) > 0.001) {
+        sunFloorPatchMatRef.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
+          sunFloorPatchMatRef.current.uniforms.uOpacity.value,
+          targetPatchOpacity,
+          4.0,
+          dt,
+        )
+        sunFloorPatchMatRef.current.uniforms.uOpenFactor.value = doorSlideRef.current
+      }
     }
 
     const targetBeamOpacity = isNightMode ? 0.0 : 0.115 + doorSlideRef.current * 0.055
     if (sunBeamMat1Ref.current) {
-      sunBeamMat1Ref.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
-        sunBeamMat1Ref.current.uniforms.uOpacity.value,
-        targetBeamOpacity,
-        4.0,
-        dt,
-      )
+      if (Math.abs(sunBeamMat1Ref.current.uniforms.uOpacity.value - targetBeamOpacity) > 0.001) {
+        sunBeamMat1Ref.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
+          sunBeamMat1Ref.current.uniforms.uOpacity.value,
+          targetBeamOpacity,
+          4.0,
+          dt,
+        )
+      }
     }
     if (sunBeamMat2Ref.current) {
-      sunBeamMat2Ref.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
-        sunBeamMat2Ref.current.uniforms.uOpacity.value,
-        targetBeamOpacity * 0.85,
-        4.0,
-        dt,
-      )
+      const targetBeam2 = targetBeamOpacity * 0.85
+      if (Math.abs(sunBeamMat2Ref.current.uniforms.uOpacity.value - targetBeam2) > 0.001) {
+        sunBeamMat2Ref.current.uniforms.uOpacity.value = THREE.MathUtils.damp(
+          sunBeamMat2Ref.current.uniforms.uOpacity.value,
+          targetBeam2,
+          4.0,
+          dt,
+        )
+      }
     }
 
     if (skyBackdropMatRef.current) {
       skyBackdropMatRef.current.color.lerp(
-        new THREE.Color(isNightMode ? '#1b263b' : '#ffffff'),
+        isNightMode ? nightSkyColor : daySkyColor,
         dt * 4,
       )
     }
@@ -312,14 +364,14 @@ export function LeftGlassDoorAndBike() {
         intensity={3.25}
         color="#ffbc75"
         castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0004}
+        shadow-mapSize={[512, 512]}
+        shadow-bias={-0.0005}
         shadow-camera-near={1}
-        shadow-camera-far={15}
-        shadow-camera-left={-3.8}
-        shadow-camera-right={3.8}
-        shadow-camera-top={3.5}
-        shadow-camera-bottom={-2.2}
+        shadow-camera-far={14}
+        shadow-camera-left={-3.5}
+        shadow-camera-right={3.5}
+        shadow-camera-top={3.2}
+        shadow-camera-bottom={-2.0}
       />
 
       {/* Natural Warm Window Sunlight Bounce Fill Inside the Left/Center Room (Daytime Only) */}
@@ -359,19 +411,15 @@ export function LeftGlassDoorAndBike() {
             uniform vec3 uColor;
             varying vec2 vUv;
             void main() {
-              // Smooth bell-curve radial & directional falloff so all 4 edges fade to 0.0 seamlessly
               float fadeLeft = smoothstep(0.0, 0.18, vUv.x);
-              float fadeRight = Math_pow(smoothstep(1.0, 0.12, vUv.x), 1.8);
+              float fadeRight = pow(smoothstep(1.0, 0.12, vUv.x), 1.8);
               float fadeZ = smoothstep(0.0, 0.28, vUv.y) * smoothstep(1.0, 0.72, vUv.y);
-              
-              // Soft center mullion shadow from the glass door frame
               float centerMullion = smoothstep(0.01, 0.08, abs(vUv.y - 0.5));
               float mullionMask = mix(centerMullion, 1.0, 0.45 + uOpenFactor * 0.45);
-
               float alpha = fadeLeft * fadeRight * fadeZ * mullionMask * uOpacity;
               gl_FragColor = vec4(uColor, alpha);
             }
-          `.replace('Math_pow', 'pow')}
+          `}
         />
       </mesh>
 
@@ -398,9 +446,7 @@ export function LeftGlassDoorAndBike() {
               uniform vec3 uColor;
               varying vec2 vUv;
               void main() {
-                // Fade smoothly along beam length (brighter near window at vUv.x=0, fading to 0 at vUv.x=1)
                 float alongBeam = smoothstep(0.0, 0.18, vUv.x) * pow(smoothstep(1.0, 0.05, vUv.x), 1.6);
-                // Gaussian-like vertical feathering so top and bottom edges have zero visible border line
                 float distY = abs(vUv.y - 0.5) * 2.0;
                 float acrossBeam = pow(max(0.0, 1.0 - distY * distY), 2.4);
                 gl_FragColor = vec4(uColor, alongBeam * acrossBeam * uOpacity);
@@ -446,25 +492,25 @@ export function LeftGlassDoorAndBike() {
       <group position={[wallX, 0, 0]}>
         {/* A. Solid Architectural Wall Sections Framing the Glass Door Opening */}
         {/* Top Header Wall above Glass Door (Y: 2.85 to 4.5, Z: -1.45 to 3.65) */}
-        <mesh position={[0, 3.675, 1.1]} receiveShadow castShadow>
+        <mesh position={[0, 3.675, 1.1]} receiveShadow raycast={() => null}>
           <boxGeometry args={[0.14, 1.65, 5.15]} />
           <meshStandardMaterial color="#f0eee8" roughness={0.88} metalness={0.02} />
         </mesh>
 
         {/* Rear Wall Pillar between Back Wall (-1.45) and Glass Door (-1.25) */}
-        <mesh position={[0, 1.425, -1.35]} receiveShadow castShadow>
+        <mesh position={[0, 1.425, -1.35]} receiveShadow raycast={() => null}>
           <boxGeometry args={[0.14, 2.85, 0.22]} />
           <meshStandardMaterial color="#f0eee8" roughness={0.88} metalness={0.02} />
         </mesh>
 
         {/* Front Wall Section from Glass Door (+1.55) to Front Entrance Wall (+3.65) */}
-        <mesh position={[0, 1.425, 2.6]} receiveShadow castShadow>
+        <mesh position={[0, 1.425, 2.6]} receiveShadow raycast={() => null}>
           <boxGeometry args={[0.14, 2.85, 2.1]} />
           <meshStandardMaterial color="#f0eee8" roughness={0.88} metalness={0.02} />
         </mesh>
 
         {/* Interior Architectural Skirting / Baseboard along Front Left Wall */}
-        <mesh position={[0.075, 0.06, 2.6]} receiveShadow>
+        <mesh position={[0.075, 0.06, 2.6]} receiveShadow raycast={() => null}>
           <boxGeometry args={[0.025, 0.12, 2.1]} />
           <meshStandardMaterial color="#fbf9f3" roughness={0.6} />
         </mesh>
@@ -472,61 +518,51 @@ export function LeftGlassDoorAndBike() {
         {/* B. Outdoor Sunlit Terrace & Mountain Scenery Outside the Glass Door (X < -3.1) */}
         <group position={[-0.08, 0, doorCenterZ]}>
           {/* Outdoor Wooden / Stone Sun Deck Terrace Floor */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-0.95, 0.002, 0]} receiveShadow>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-0.95, 0.002, 0]} receiveShadow raycast={() => null}>
             <planeGeometry args={[2.0, 4.4]} />
             <meshStandardMaterial color="#c8b496" roughness={0.82} metalness={0.04} />
           </mesh>
 
           {/* Minimalist Outdoor Glass & Matte Black Balcony Railing */}
-          <mesh position={[-1.65, 0.52, 0]}>
+          <mesh position={[-1.65, 0.52, 0]} raycast={() => null}>
             <boxGeometry args={[0.02, 1.0, 3.8]} />
-            <meshPhysicalMaterial
+            <meshBasicMaterial
               color="#dceef5"
               transparent
               opacity={0.22}
-              roughness={0.08}
-              metalness={0.1}
               depthWrite={false}
             />
           </mesh>
-          <mesh position={[-1.65, 1.03, 0]}>
+          <mesh position={[-1.65, 1.03, 0]} raycast={() => null}>
             <boxGeometry args={[0.04, 0.035, 3.8]} />
             <meshStandardMaterial color="#222320" roughness={0.4} metalness={0.7} />
           </mesh>
 
-          {/* Panoramic Outdoor Mountain-Lake Scenery Backdrop (fog={false} so scene fog never washes out the image!) */}
-          <mesh position={[-2.05, 1.65, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[6.8, 4.4]} />
-            <meshBasicMaterial
-              ref={skyBackdropMatRef}
-              map={outdoorTexture}
-              color="#ffffff"
-              fog={false}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
+          {/* Panoramic Outdoor Mountain-Lake Scenery Backdrop */}
+          <Suspense fallback={null}>
+            <OutdoorMountainBackdrop skyBackdropMatRef={skyBackdropMatRef} />
+          </Suspense>
         </group>
 
         {/* C. Heavy Anodized Matte Charcoal Aluminum Outer Door Frame */}
         <group position={[0, 0, doorCenterZ]}>
           {/* Top Frame Track */}
-          <mesh position={[0, doorOpeningHeight - 0.03, 0]} castShadow receiveShadow>
+          <mesh position={[0, doorOpeningHeight - 0.03, 0]} receiveShadow raycast={() => null}>
             <boxGeometry args={[0.16, 0.06, doorOpeningWidth + 0.08]} />
             <meshStandardMaterial color="#222320" roughness={0.38} metalness={0.65} />
           </mesh>
           {/* Bottom Floor Threshold Track */}
-          <mesh position={[0, 0.015, 0]} receiveShadow>
+          <mesh position={[0, 0.015, 0]} receiveShadow raycast={() => null}>
             <boxGeometry args={[0.16, 0.03, doorOpeningWidth + 0.08]} />
             <meshStandardMaterial color="#2c2d29" roughness={0.45} metalness={0.7} />
           </mesh>
           {/* Rear Vertical Jamb */}
-          <mesh position={[0, doorOpeningHeight / 2, -doorOpeningWidth / 2 - 0.02]} castShadow>
+          <mesh position={[0, doorOpeningHeight / 2, -doorOpeningWidth / 2 - 0.02]} raycast={() => null}>
             <boxGeometry args={[0.16, doorOpeningHeight, 0.06]} />
             <meshStandardMaterial color="#222320" roughness={0.38} metalness={0.65} />
           </mesh>
           {/* Front Vertical Jamb */}
-          <mesh position={[0, doorOpeningHeight / 2, doorOpeningWidth / 2 + 0.02]} castShadow>
+          <mesh position={[0, doorOpeningHeight / 2, doorOpeningWidth / 2 + 0.02]} raycast={() => null}>
             <boxGeometry args={[0.16, doorOpeningHeight, 0.06]} />
             <meshStandardMaterial color="#222320" roughness={0.38} metalness={0.65} />
           </mesh>
@@ -536,34 +572,32 @@ export function LeftGlassDoorAndBike() {
              ----------------------------------------------------------------- */}
           <group position={[-0.025, doorOpeningHeight / 2, -0.68]}>
             {/* Aluminum Perimeter Stile & Rail */}
-            <mesh position={[0, doorOpeningHeight / 2 - 0.045, 0]} castShadow>
+            <mesh position={[0, doorOpeningHeight / 2 - 0.045, 0]} raycast={() => null}>
               <boxGeometry args={[0.045, 0.05, leafWidth]} />
               <meshStandardMaterial color="#262724" roughness={0.35} metalness={0.6} />
             </mesh>
-            <mesh position={[0, -doorOpeningHeight / 2 + 0.045, 0]} castShadow>
+            <mesh position={[0, -doorOpeningHeight / 2 + 0.045, 0]} raycast={() => null}>
               <boxGeometry args={[0.045, 0.05, leafWidth]} />
               <meshStandardMaterial color="#262724" roughness={0.35} metalness={0.6} />
             </mesh>
-            <mesh position={[0, 0, -leafWidth / 2 + 0.025]} castShadow>
+            <mesh position={[0, 0, -leafWidth / 2 + 0.025]} raycast={() => null}>
               <boxGeometry args={[0.045, doorOpeningHeight - 0.08, 0.05]} />
               <meshStandardMaterial color="#262724" roughness={0.35} metalness={0.6} />
             </mesh>
-            <mesh position={[0, 0, leafWidth / 2 - 0.025]} castShadow>
+            <mesh position={[0, 0, leafWidth / 2 - 0.025]} raycast={() => null}>
               <boxGeometry args={[0.045, doorOpeningHeight - 0.08, 0.05]} />
               <meshStandardMaterial color="#262724" roughness={0.35} metalness={0.6} />
             </mesh>
 
             {/* Fixed Tempered Architectural Glass Pane */}
-            <mesh rotation={[0, Math.PI / 2, 0]}>
+            <mesh rotation={[0, Math.PI / 2, 0]} raycast={() => null}>
               <planeGeometry args={[leafWidth - 0.08, doorOpeningHeight - 0.1]} />
-              <meshPhysicalMaterial
+              <meshStandardMaterial
                 color="#e8f5f8"
                 transparent
                 opacity={0.18}
-                roughness={0.04}
+                roughness={0.05}
                 metalness={0.1}
-                clearcoat={1}
-                clearcoatRoughness={0.08}
                 side={THREE.DoubleSide}
                 depthWrite={false}
               />
@@ -583,7 +617,7 @@ export function LeftGlassDoorAndBike() {
           >
             {/* Sliding Door Aluminum Frame Stile & Rail */}
             {/* Top Rail */}
-            <mesh position={[0, doorOpeningHeight / 2 - 0.045, 0]} castShadow>
+            <mesh position={[0, doorOpeningHeight / 2 - 0.045, 0]} raycast={() => null}>
               <boxGeometry args={[0.05, 0.055, leafWidth]} />
               <meshStandardMaterial
                 color={isDoorHovered ? '#353732' : '#262724'}
@@ -592,7 +626,7 @@ export function LeftGlassDoorAndBike() {
               />
             </mesh>
             {/* Bottom Rail */}
-            <mesh position={[0, -doorOpeningHeight / 2 + 0.045, 0]} castShadow>
+            <mesh position={[0, -doorOpeningHeight / 2 + 0.045, 0]} raycast={() => null}>
               <boxGeometry args={[0.05, 0.055, leafWidth]} />
               <meshStandardMaterial
                 color={isDoorHovered ? '#353732' : '#262724'}
@@ -601,7 +635,7 @@ export function LeftGlassDoorAndBike() {
               />
             </mesh>
             {/* Left (Rear) Vertical Stile */}
-            <mesh position={[0, 0, -leafWidth / 2 + 0.028]} castShadow>
+            <mesh position={[0, 0, -leafWidth / 2 + 0.028]} raycast={() => null}>
               <boxGeometry args={[0.05, doorOpeningHeight - 0.08, 0.055]} />
               <meshStandardMaterial
                 color={isDoorHovered ? '#353732' : '#262724'}
@@ -610,7 +644,7 @@ export function LeftGlassDoorAndBike() {
               />
             </mesh>
             {/* Right (Front Latch) Vertical Stile */}
-            <mesh position={[0, 0, leafWidth / 2 - 0.028]} castShadow>
+            <mesh position={[0, 0, leafWidth / 2 - 0.028]} raycast={() => null}>
               <boxGeometry args={[0.05, doorOpeningHeight - 0.08, 0.055]} />
               <meshStandardMaterial
                 color={isDoorHovered ? '#353732' : '#262724'}
@@ -619,17 +653,15 @@ export function LeftGlassDoorAndBike() {
               />
             </mesh>
 
-            {/* Crystal-Clear Tempered Glass Pane */}
+            {/* Crystal-Clear Tempered Glass Pane (acts as single hit plane for sliding door) */}
             <mesh rotation={[0, Math.PI / 2, 0]}>
               <planeGeometry args={[leafWidth - 0.09, doorOpeningHeight - 0.1]} />
-              <meshPhysicalMaterial
+              <meshStandardMaterial
                 color="#eef8fa"
                 transparent
                 opacity={isDoorHovered ? 0.24 : 0.17}
-                roughness={0.04}
+                roughness={0.05}
                 metalness={0.1}
-                clearcoat={1}
-                clearcoatRoughness={0.05}
                 side={THREE.DoubleSide}
                 depthWrite={false}
               />
@@ -639,6 +671,7 @@ export function LeftGlassDoorAndBike() {
             <mesh
               position={[0.028, 0.2, 0.1]}
               rotation={[0.45, Math.PI / 2, 0]}
+              raycast={() => null}
             >
               <planeGeometry args={[0.07, 1.1]} />
               <meshBasicMaterial
@@ -650,14 +683,14 @@ export function LeftGlassDoorAndBike() {
             </mesh>
 
             {/* Modern Brushed Stainless & Electric Yellow Vertical Pull Handle */}
-            <group position={[0.042, -0.15, leafWidth / 2 - 0.09]}>
+            <group position={[0.042, -0.15, leafWidth / 2 - 0.09]} raycast={() => null}>
               {/* Top & Bottom Standoffs */}
               <mesh position={[0, 0.16, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.008, 0.008, 0.032, 16]} />
+                <cylinderGeometry args={[0.008, 0.008, 0.032, 12]} />
                 <meshStandardMaterial color="#d4d7db" metalness={0.9} roughness={0.2} />
               </mesh>
               <mesh position={[0, -0.16, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.008, 0.008, 0.032, 16]} />
+                <cylinderGeometry args={[0.008, 0.008, 0.032, 12]} />
                 <meshStandardMaterial color="#d4d7db" metalness={0.9} roughness={0.2} />
               </mesh>
 
@@ -666,8 +699,7 @@ export function LeftGlassDoorAndBike() {
                 args={[0.018, 0.42, 0.022]}
                 position={[0.018, 0, 0]}
                 radius={0.005}
-                smoothness={3}
-                castShadow
+                smoothness={2}
               >
                 <meshStandardMaterial color="#e0e3e7" metalness={0.92} roughness={0.18} />
               </RoundedBox>
@@ -699,9 +731,8 @@ export function LeftGlassDoorAndBike() {
           position={[0, 0.012, 0]}
           rotation={[0, 0.42, 0]}
           radius={0.008}
-          smoothness={3}
+          smoothness={2}
           receiveShadow
-          castShadow
         >
           <meshStandardMaterial
             color="#262724"
@@ -710,11 +741,22 @@ export function LeftGlassDoorAndBike() {
           />
         </RoundedBox>
 
+        {/* Soft Baked Contact Shadow Oval directly under the Bike Tires & Engine */}
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0.42]}
+          position={[0, 0.0255, 0]}
+          raycast={() => null}
+        >
+          <planeGeometry args={[0.68, 1.85]} />
+          <meshBasicMaterial color="#0b0c0a" transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+
         {/* Subtle Brushed Brass / Warm Gold Inlay Trim around Bike Plinth */}
         <mesh
           rotation={[-Math.PI / 2, 0, 0.42]}
           position={[0, 0.025, 0]}
           receiveShadow
+          raycast={() => null}
         >
           <ringGeometry args={[0.58, 0.60, 4]} />
           <meshBasicMaterial color="#f5d000" transparent opacity={0.45} />
@@ -733,7 +775,9 @@ export function LeftGlassDoorAndBike() {
         />
 
         {/* The 1970 Honda CB 750 F Super Sport GLB Model */}
-        <HondaBikeModel onHover={setIsBikeHovered} onClick={handleBikeClick} />
+        <Suspense fallback={null}>
+          <HondaBikeModel onHover={setIsBikeHovered} onClick={handleBikeClick} />
+        </Suspense>
 
         {/* Interactive Beacon Floating Above the Bike */}
         <InteractiveObjectBeacon
@@ -747,6 +791,3 @@ export function LeftGlassDoorAndBike() {
     </group>
   )
 }
-
-useGLTF.preload(BIKE_MODEL_PATH)
-

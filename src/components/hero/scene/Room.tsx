@@ -18,7 +18,10 @@ export function Room() {
   useFrame((_, delta) => {
     targetFogColor.current.set(isNightMode ? '#10141e' : '#f0eee8')
     if (fogRef.current) {
-      fogRef.current.color.lerp(targetFogColor.current, delta * 4)
+      const dr = Math.abs(fogRef.current.color.r - targetFogColor.current.r)
+      if (dr > 0.001) {
+        fogRef.current.color.lerp(targetFogColor.current, delta * 4)
+      }
     }
   })
 

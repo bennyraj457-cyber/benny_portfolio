@@ -14,9 +14,6 @@ export function Lighting() {
   const screenFillRef = useRef<THREE.PointLight>(null)
   const rimSpotRef = useRef<THREE.SpotLight>(null)
 
-  // In Day Mode: all artificial room lights are switched OFF (0 intensity) and the room is
-  // illuminated purely by natural sunlight streaming through the left side glass door!
-  // In Night Mode: artificial studio lights (screen fill, rim spot, desk lamp, bike spot) switch ON.
   const targetAmbientColor = useMemoColor(isNightMode ? '#1a1f2c' : '#fff3e0')
   const targetAmbientIntensity = isNightMode ? 0.22 : 0.42
 
@@ -24,16 +21,22 @@ export function Lighting() {
   const targetHemiGroundColor = useMemoColor(isNightMode ? '#10141d' : '#dcd2c0')
   const targetHemiIntensity = isNightMode ? 0.18 : 0.48
 
-  // Right-side studio key light is OFF in daytime so all directional shadows come from the left side window sun
   const targetSunColor = useMemoColor(isNightMode ? '#3f5982' : '#fbf9f3')
   const targetSunIntensity = isNightMode ? 0.18 : 0.0
 
-  // Monitor screen fill and artificial rim spotlight are OFF in daytime
   const targetScreenIntensity = isNightMode ? 0.85 : 0.0
   const targetScreenColor = useMemoColor(isNightMode ? '#a0c4ff' : '#f5f3ee')
 
   useFrame((_, delta) => {
-    const rate = 4 // smooth transition speed
+    // Early-exit when lighting transition has already settled
+    if (
+      ambientRef.current &&
+      Math.abs(ambientRef.current.intensity - targetAmbientIntensity) < 0.001
+    ) {
+      return
+    }
+
+    const rate = 4
 
     if (ambientRef.current) {
       ambientRef.current.intensity = THREE.MathUtils.damp(ambientRef.current.intensity, targetAmbientIntensity, rate, delta)
@@ -75,21 +78,12 @@ export function Lighting() {
         intensity={0.55}
       />
 
-      {/* Primary Studio Key Light (Day: bright sunlight through window, Night: moon/sky glow) */}
+      {/* Secondary Studio Key Light (No duplicate shadow map—LeftGlassDoorAndBike casts the primary sun shadow) */}
       <directionalLight
         ref={sunDirRef}
         position={[2.8, 3.8, 2.2]}
         intensity={1.35}
         color="#fbf9f3"
-        castShadow
-        shadow-mapSize={[512, 512]}
-        shadow-bias={-0.0004}
-        shadow-camera-near={0.5}
-        shadow-camera-far={10}
-        shadow-camera-left={-2.5}
-        shadow-camera-right={2.5}
-        shadow-camera-top={2.5}
-        shadow-camera-bottom={-2.5}
       />
 
       {/* Monitor Screen Dynamic Fill Glow (Bright & cool-blue in midnight dev mode) */}
@@ -112,14 +106,14 @@ export function Lighting() {
         color="#ffffff"
       />
 
-      {/* Soft Museum-Grade Contact Shadows Anchoring Desk & Chair to Floor */}
+      {/* Soft Baked Contact Shadows Anchoring Desk & Chair to Floor (frames=1 = baked once at startup!) */}
       <ContactShadows
         position={[0, 0.001, 0]}
-        opacity={isNightMode ? 0.35 : 0.6}
+        opacity={0.52}
         scale={8}
         blur={1.8}
         far={2.5}
-        resolution={512}
+        resolution={256}
         frames={1}
         color="#15171a"
       />

@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { Suspense, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { createStudioWallPlaqueTexture } from './doorWallPlaqueTexture'
@@ -17,7 +17,9 @@ function TallHousePlantModel() {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.castShadow = false
-        mesh.receiveShadow = true
+        mesh.receiveShadow = false
+        // Disable CPU raycasting on high-poly plant leaves
+        mesh.raycast = () => null
 
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshStandardMaterial
@@ -47,6 +49,7 @@ useGLTF.preload(TALL_PLANT_MODEL_PATH)
 /**
  * Architectural Vertical Wood Acoustic Slats Feature Wall (Floor to Ceiling)
  * Backed by acoustic charcoal felt with natural warm oak / walnut slats.
+ * Uses a single InstancedMesh for all slats to reduce draw calls from 44 to 2.
  */
 function AcousticWoodSlats({
   xStart,
@@ -64,33 +67,38 @@ function AcousticWoodSlats({
   slatDepth?: number
 }) {
   const count = Math.floor(width / (slatWidth + gap))
+  const instancedRef = useMemo(() => {
+    const geom = new THREE.BoxGeometry(slatWidth, height, slatDepth)
+    const mat = new THREE.MeshStandardMaterial({
+      color: '#b58a58', // Natural Warm White Oak
+      roughness: 0.65,
+      metalness: 0.02,
+    })
+    const mesh = new THREE.InstancedMesh(geom, mat, count)
+    mesh.receiveShadow = true
+    mesh.raycast = () => null
+
+    const dummy = new THREE.Object3D()
+    for (let i = 0; i < count; i++) {
+      const xOffset = -width / 2 + (i + 0.5) * (slatWidth + gap)
+      dummy.position.set(xOffset, 0, 0.003 + slatDepth / 2)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(i, dummy.matrix)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+    return mesh
+  }, [count, width, height, slatWidth, gap, slatDepth])
 
   return (
     <group position={[xStart + width / 2, height / 2, 0.052]}>
       {/* 1. Acoustic Charcoal Backing Felt Panel */}
-      <mesh receiveShadow position={[0, 0, 0.003]}>
+      <mesh receiveShadow position={[0, 0, 0.003]} raycast={() => null}>
         <planeGeometry args={[width, height]} />
         <meshStandardMaterial color="#1f201d" roughness={0.95} metalness={0.05} />
       </mesh>
 
-      {/* 2. Vertical Warm Oak Wood Slats with Rich Linear Cast Shadows */}
-      {Array.from({ length: count }).map((_, i) => {
-        const xOffset = -width / 2 + (i + 0.5) * (slatWidth + gap)
-        return (
-          <mesh
-            key={`wood-slat-${i}`}
-            position={[xOffset, 0, 0.003 + slatDepth / 2]}
-            receiveShadow
-          >
-            <boxGeometry args={[slatWidth, height, slatDepth]} />
-            <meshStandardMaterial
-              color="#b58a58" // Natural Warm White Oak
-              roughness={0.65}
-              metalness={0.02}
-            />
-          </mesh>
-        )
-      })}
+      {/* 2. Single-Draw-Call Instanced Warm Oak Wood Slats */}
+      <primitive object={instancedRef} />
     </group>
   )
 }
@@ -193,7 +201,9 @@ export function EntranceWallDecor() {
       {/* ===================================================================
           3. TALL HOUSE PLANT 3D MODEL (Left side of door)
          =================================================================== */}
-      <TallHousePlantModel />
+      <Suspense fallback={null}>
+        <TallHousePlantModel />
+      </Suspense>
     </group>
   )
 }

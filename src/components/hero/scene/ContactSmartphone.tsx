@@ -30,6 +30,10 @@ interface ScreenHotspotRect {
   href: string
 }
 
+const LOGICAL_SCREEN_W = 1024
+const LOGICAL_SCREEN_H = 2160
+const SCREEN_RENDER_SCALE = 0.5 // 512x1080 physical canvas (4x faster redraw & VRAM upload)
+
 /**
  * Helper to draw a rounded rectangle path on a 2D canvas context.
  */
@@ -105,7 +109,6 @@ function drawChannelIcon(
   ctx.lineJoin = 'round'
 
   if (id === 'email') {
-    // Envelope icon
     const w = 32
     const h = 22
     roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, 4)
@@ -116,19 +119,16 @@ function drawChannelIcon(
     ctx.lineTo(cx + w / 2 - 2, cy - h / 2 + 2)
     ctx.stroke()
   } else if (id === 'linkedin') {
-    // Crisp "in" monogram
     ctx.font = '700 28px "Space Grotesk", "Inter", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText('in', cx, cy + 1)
   } else if (id === 'github') {
-    // Developer code brackets `</>`
     ctx.font = '700 23px "JetBrains Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText('</>', cx, cy + 1)
   } else if (id === 'whatsapp') {
-    // Chat bubble with phone receiver dot
     ctx.beginPath()
     ctx.arc(cx, cy - 1, 14, 0.25 * Math.PI, 2.05 * Math.PI)
     ctx.lineTo(cx - 14, cy + 14)
@@ -144,19 +144,22 @@ function drawChannelIcon(
 
 /**
  * Renders the complete animated smartphone screen (Lock Screen <-> Unlocked Contact OS)
- * onto the 1024x2160 high-DPI canvas and returns the clickable hotspot rectangles.
+ * in 1024x2160 logical coordinates onto a 512x1080 physical canvas.
  */
 function renderSmartphoneScreen(
   ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
   content: ContactContentConfig,
   unlockProgress: number,
   hoveredTarget: InteractiveScreenTargetId,
   pressedTarget: InteractiveScreenTargetId,
 ): ScreenHotspotRect[] {
+  const width = LOGICAL_SCREEN_W
+  const height = LOGICAL_SCREEN_H
   const p = THREE.MathUtils.clamp(unlockProgress, 0, 1)
   const smoothP = p * p * (3 - 2 * p)
+
+  ctx.save()
+  ctx.scale(SCREEN_RENDER_SCALE, SCREEN_RENDER_SCALE)
 
   // 1. Base OLED Obsidian Screen Background
   const bgGrad = ctx.createLinearGradient(0, 0, 0, height)
@@ -272,13 +275,12 @@ function renderSmartphoneScreen(
   }
 
   // ---------------------------------------------------------------------------
-  // LAYER B: UNLOCKED CONTACT OS INTERFACE (Slides & fades in as unlockProgress -> 1)
+  // LAYER B: UNLOCKED CONTACT OS INTERFACE
   // ---------------------------------------------------------------------------
   const hotspots: ScreenHotspotRect[] = []
   const padX = 64
   const cardW = width - padX * 2
 
-  // Compute hotspot geometry deterministically so click/hover detection works anytime
   const listStartY = 670
   const rowH = 216
   const rowGap = 30
@@ -385,7 +387,7 @@ function renderSmartphoneScreen(
       roundRectPath(ctx, padX, rowY, cardW, rowH, 38)
       ctx.fill()
 
-      // Card border (bright electric yellow when hovered)
+      // Card border
       ctx.strokeStyle = isRowHovered
         ? '#f5d000'
         : 'rgba(255, 255, 255, 0.14)'
@@ -417,7 +419,7 @@ function renderSmartphoneScreen(
         isRowHovered,
       )
 
-      // Channel Label (e.g., "Email", "LinkedIn", "GitHub", "WhatsApp")
+      // Channel Label
       const textX = badgeX + badgeSize + 36
       ctx.textAlign = 'left'
       ctx.textBaseline = 'alphabetic'
@@ -425,7 +427,7 @@ function renderSmartphoneScreen(
       ctx.fillStyle = '#fbf9f3'
       ctx.fillText(channel.label, textX, rowY + 92)
 
-      // Configured Channel Value (e.g. "[YOUR EMAIL]", "[YOUR LINKEDIN URL]")
+      // Configured Channel Value
       ctx.font = '500 31px "JetBrains Mono", monospace'
       ctx.fillStyle = isRowHovered ? '#f5d000' : '#b8b6af'
       ctx.fillText(channel.value, textX, rowY + 150)
@@ -487,15 +489,13 @@ function renderSmartphoneScreen(
   }
 
   // ---------------------------------------------------------------------------
-  // LAYER C: PERSISTENT OS HARDWARE CHROME (Bezel, Dynamic Island, Status Bar, Home Bar)
+  // LAYER C: PERSISTENT OS HARDWARE CHROME
   // ---------------------------------------------------------------------------
-  // Slim OLED Screen Bezel Border
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)'
   ctx.lineWidth = 8
   roundRectPath(ctx, 16, 16, width - 32, height - 32, 118)
   ctx.stroke()
 
-  // Top Status Bar Time (shown on top-left when unlocked)
   if (smoothP > 0.15) {
     ctx.save()
     ctx.globalAlpha = smoothP
@@ -516,7 +516,6 @@ function renderSmartphoneScreen(
   roundRectPath(ctx, pillX, pillY, pillW, pillH, 37)
   ctx.fill()
 
-  // Front camera lens inside the Dynamic Island
   ctx.fillStyle = '#151821'
   ctx.beginPath()
   ctx.arc(pillX + pillW - 48, pillY + pillH / 2, 14, 0, Math.PI * 2)
@@ -526,13 +525,11 @@ function renderSmartphoneScreen(
   ctx.arc(pillX + pillW - 52, pillY + pillH / 2 - 4, 5, 0, Math.PI * 2)
   ctx.fill()
 
-  // Tiny electric-yellow active indicator dot inside island
   ctx.fillStyle = '#f5d000'
   ctx.beginPath()
   ctx.arc(pillX + 48, pillY + pillH / 2, 8, 0, Math.PI * 2)
   ctx.fill()
 
-  // Status bar signal & battery icons (top right)
   ctx.fillStyle = 'rgba(251, 249, 243, 0.8)'
   ctx.fillRect(width - 192, 86, 8, 16)
   ctx.fillRect(width - 178, 80, 8, 22)
@@ -544,7 +541,6 @@ function renderSmartphoneScreen(
   ctx.fillStyle = '#f5d000'
   ctx.fillRect(width - 130, 80, 40, 16)
 
-  // Subtle Diagonal Glass Specular Sheen
   const sheenGrad = ctx.createLinearGradient(0, 0, width, height * 0.65)
   sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0.045)')
   sheenGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.012)')
@@ -552,18 +548,14 @@ function renderSmartphoneScreen(
   ctx.fillStyle = sheenGrad
   ctx.fillRect(0, 0, width, height)
 
-  // Bottom Home Indicator Bar
   ctx.fillStyle = 'rgba(251, 249, 243, 0.7)'
   roundRectPath(ctx, (width - 328) / 2, height - 52, 328, 14, 7)
   ctx.fill()
 
+  ctx.restore()
   return hotspots
 }
 
-/**
- * Triggers the configured contact action (mailto:, https:// LinkedIn/GitHub/WhatsApp)
- * safely across desktop and mobile browsers.
- */
 function triggerContactAction(href: string) {
   if (typeof window === 'undefined' || !href) return
 
@@ -582,6 +574,13 @@ export function ContactSmartphone({
   const { activeObject, isSmartphoneOpen, isAnyObjectOpen, openSmartphone } = useWorkspaceFocus()
   const [isHovered, setIsHovered] = useState(false)
 
+  const prefersReducedMotion = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+
   const groupRef = useRef<THREE.Group>(null)
   const glowRingMaterialRef = useRef<THREE.MeshBasicMaterial>(null)
   const screenMaterialRef = useRef<THREE.MeshStandardMaterial>(null)
@@ -590,31 +589,30 @@ export function ContactSmartphone({
   const hoverProgressRef = useRef(0)
   const unlockProgressRef = useRef(0)
 
-  // Interactive screen state stored in refs for smooth 60fps canvas redraws without React re-renders
   const hoveredScreenTargetRef = useRef<InteractiveScreenTargetId>(null)
   const pressedScreenTargetRef = useRef<InteractiveScreenTargetId>(null)
   const hotspotsRef = useRef<ScreenHotspotRect[]>([])
   const needsScreenRedrawRef = useRef<boolean>(true)
   const pressTimeoutRef = useRef<number | null>(null)
 
-  // Create the 1024x2160 high-DPI screen canvas and texture once
-  const { screenCanvas, screenCtx, screenTexture } = useMemo(() => {
+  // Create the 512x1080 screen canvas and texture once (75% less pixel fill cost than 1024x2160)
+  const { screenCtx, screenTexture } = useMemo(() => {
     const canvas = document.createElement('canvas')
-    canvas.width = 1024
-    canvas.height = 2160
+    canvas.width = Math.round(LOGICAL_SCREEN_W * SCREEN_RENDER_SCALE)
+    canvas.height = Math.round(LOGICAL_SCREEN_H * SCREEN_RENDER_SCALE)
     const ctx = canvas.getContext('2d')!
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
-    texture.anisotropy = 16
-    return { screenCanvas: canvas, screenCtx: ctx, screenTexture: texture }
+    texture.anisotropy = 4
+    texture.generateMipmaps = false
+    texture.minFilter = THREE.LinearFilter
+    return { screenCtx: ctx, screenTexture: texture }
   }, [])
 
   // Perform initial lock-screen draw and clean up resources on unmount
   useEffect(() => {
     hotspotsRef.current = renderSmartphoneScreen(
       screenCtx,
-      screenCanvas.width,
-      screenCanvas.height,
       content,
       unlockProgressRef.current,
       hoveredScreenTargetRef.current,
@@ -629,15 +627,12 @@ export function ContactSmartphone({
       screenTexture.dispose()
       document.body.style.cursor = 'auto'
     }
-  }, [content, screenCanvas, screenCtx, screenTexture])
+  }, [content, screenCtx, screenTexture])
 
-  /**
-   * Maps a ThreeEvent UV coordinate on the OLED screen plane to a matching Contact button hotspot.
-   */
   const getHotspotFromUV = useCallback((uv?: THREE.Vector2): ScreenHotspotRect | null => {
     if (!uv) return null
-    const cx = uv.x * 1024
-    const cy = (1 - uv.y) * 2160
+    const cx = uv.x * LOGICAL_SCREEN_W
+    const cy = (1 - uv.y) * LOGICAL_SCREEN_H
     for (const spot of hotspotsRef.current) {
       if (
         cx >= spot.x &&
@@ -712,7 +707,6 @@ export function ContactSmartphone({
     (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation()
 
-      // 1. If we are in normal workspace mode, clicking the smartphone zooms in & unlocks Contact
       if (!isSmartphoneOpen) {
         if (activeObject === null) {
           setIsHovered(false)
@@ -722,7 +716,6 @@ export function ContactSmartphone({
         return
       }
 
-      // 2. If the smartphone is open and unlocked, check if the user tapped a Contact channel or CTA
       if (unlockProgressRef.current > 0.6) {
         const hit = getHotspotFromUV(e.uv)
         if (hit) {
@@ -750,20 +743,26 @@ export function ContactSmartphone({
 
   // Smoothly animate hover highlight, phone rotation alignment, and Lock Screen -> Contact OS transition
   useFrame((_, delta) => {
+    const hoverTarget = isHovered && activeObject === null ? 1 : 0
+    const unlockTarget = isSmartphoneOpen ? 1 : 0
+
+    // Early-exit when idle and no screen redraw is queued
+    if (
+      !needsScreenRedrawRef.current &&
+      Math.abs(hoverProgressRef.current - hoverTarget) < 0.001 &&
+      Math.abs(unlockProgressRef.current - unlockTarget) < 0.001
+    ) {
+      return
+    }
+
     const dt = Math.min(delta, 0.1)
 
-    // 1. Desk hover interpolation (only when in workspace overview)
-    const hoverTarget = isHovered && activeObject === null ? 1 : 0
+    // 1. Desk hover interpolation
     const hoverFactor = 1 - Math.exp(-10 * dt)
     hoverProgressRef.current += (hoverTarget - hoverProgressRef.current) * hoverFactor
     const hp = hoverProgressRef.current
 
     // 2. Smartphone screen unlock & straightening interpolation
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    const unlockTarget = isSmartphoneOpen ? 1 : 0
     const unlockSpeed = prefersReducedMotion ? 16 : isSmartphoneOpen ? 3.4 : 5.0
     const unlockFactor = 1 - Math.exp(-unlockSpeed * dt)
     const prevUnlock = unlockProgressRef.current
@@ -773,11 +772,10 @@ export function ContactSmartphone({
       unlockFactor,
     )
 
-    if (Math.abs(unlockProgressRef.current - prevUnlock) > 0.001) {
+    if (Math.abs(unlockProgressRef.current - prevUnlock) > 0.008) {
       needsScreenRedrawRef.current = true
     }
 
-    // Delay screen unlock slightly while camera begins zooming in
     const rawUnlock = THREE.MathUtils.clamp(
       isSmartphoneOpen
         ? (unlockProgressRef.current - 0.15) / 0.85
@@ -788,9 +786,7 @@ export function ContactSmartphone({
     const smoothUnlock = rawUnlock * rawUnlock * (3 - 2 * rawUnlock)
 
     if (groupRef.current) {
-      // Subtle lift on desk hover; flat on desk when zoomed in
       groupRef.current.position.y = position[1] + hp * 0.0016
-      // Smoothly straighten the phone's yaw angle from -0.26 rad to 0 rad when open so the screen is upright for the reader
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         rotation[1],
         0,
@@ -803,7 +799,6 @@ export function ContactSmartphone({
     }
 
     if (screenMaterialRef.current) {
-      // Crisp self-illuminated OLED brightness when unlocked or hovered
       screenMaterialRef.current.emissiveIntensity = THREE.MathUtils.lerp(
         0.55 + hp * 0.3,
         0.92,
@@ -815,13 +810,11 @@ export function ContactSmartphone({
       accentMaterialRef.current.emissiveIntensity = 0.25 + hp * 0.65
     }
 
-    // Redraw the 1024x2160 CanvasTexture only when the unlock transition or button hover/tap state changes
+    // Redraw the 512x1080 CanvasTexture only when unlock transition or button hover/tap state changes
     if (needsScreenRedrawRef.current) {
       needsScreenRedrawRef.current = false
       hotspotsRef.current = renderSmartphoneScreen(
         screenCtx,
-        screenCanvas.width,
-        screenCanvas.height,
         content,
         smoothUnlock,
         hoveredScreenTargetRef.current,
@@ -847,8 +840,8 @@ export function ContactSmartphone({
       onClick={handleClick}
     >
       {/* Subtle Aureolin (#f5d000) Hover Halo Ring on the Desk Surface */}
-      <mesh position={[0, 0.0008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.088, 0.098, 48]} />
+      <mesh position={[0, 0.0008, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <ringGeometry args={[0.088, 0.098, 36]} />
         <meshBasicMaterial
           ref={glowRingMaterialRef}
           color="#f5d000"
@@ -863,7 +856,8 @@ export function ContactSmartphone({
         args={[width + 0.007, 0.0018, length + 0.007]}
         position={[0, 0.0012, 0]}
         radius={0.009}
-        smoothness={4}
+        smoothness={2}
+        raycast={() => null}
       >
         <meshBasicMaterial
           color="#f5d000"
@@ -882,13 +876,14 @@ export function ContactSmartphone({
         distanceFactor={2.2}
       />
 
-      {/* 1. Rear Camera Bump Pad (Bottom-Left Under Corner, giving a realistic 1mm desk contact shadow) */}
+      {/* 1. Rear Camera Bump Pad */}
       <RoundedBox
         args={[0.026, 0.0016, 0.028]}
         position={[-width * 0.22, 0.0008, -length * 0.32]}
         radius={0.003}
         smoothness={2}
         castShadow
+        raycast={() => null}
       >
         <meshStandardMaterial color="#181917" roughness={0.3} metalness={0.85} />
       </RoundedBox>
@@ -898,7 +893,7 @@ export function ContactSmartphone({
         args={[width, thickness, length]}
         position={[0, thickness / 2 + 0.0006, 0]}
         radius={0.0038}
-        smoothness={4}
+        smoothness={2}
         castShadow
         receiveShadow
       >
@@ -914,7 +909,8 @@ export function ContactSmartphone({
         args={[width - 0.0022, thickness + 0.0004, length - 0.0022]}
         position={[0, thickness / 2 + 0.0007, 0]}
         radius={0.0032}
-        smoothness={4}
+        smoothness={2}
+        raycast={() => null}
       >
         <meshStandardMaterial
           color="#0d0e0c"
@@ -944,13 +940,12 @@ export function ContactSmartphone({
       </mesh>
 
       {/* 5. Physical Metallic Side Buttons */}
-      {/* Right Side — Action / Power Button with Subtle Electric-Yellow Accent */}
       <RoundedBox
         args={[0.0018, 0.0026, 0.018]}
         position={[width / 2 + 0.0006, thickness / 2 + 0.0006, -0.022]}
         radius={0.0006}
         smoothness={2}
-        castShadow
+        raycast={() => null}
       >
         <meshStandardMaterial
           ref={accentMaterialRef}
@@ -962,30 +957,27 @@ export function ContactSmartphone({
         />
       </RoundedBox>
 
-      {/* Left Side — Volume Up Button */}
       <RoundedBox
         args={[0.0016, 0.0024, 0.014]}
         position={[-width / 2 - 0.0005, thickness / 2 + 0.0006, -0.032]}
         radius={0.0005}
         smoothness={2}
-        castShadow
+        raycast={() => null}
       >
         <meshStandardMaterial color="#383a36" roughness={0.28} metalness={0.88} />
       </RoundedBox>
 
-      {/* Left Side — Volume Down Button */}
       <RoundedBox
         args={[0.0016, 0.0024, 0.014]}
         position={[-width / 2 - 0.0005, thickness / 2 + 0.0006, -0.012]}
         radius={0.0005}
         smoothness={2}
-        castShadow
+        raycast={() => null}
       >
         <meshStandardMaterial color="#383a36" roughness={0.28} metalness={0.88} />
       </RoundedBox>
 
-      {/* Bottom Edge — USB-C Port & Speaker Grille Detailing */}
-      <mesh position={[0, thickness / 2 + 0.0006, length / 2 + 0.0002]}>
+      <mesh position={[0, thickness / 2 + 0.0006, length / 2 + 0.0002]} raycast={() => null}>
         <boxGeometry args={[0.01, 0.0022, 0.001]} />
         <meshStandardMaterial color="#090908" roughness={0.5} metalness={0.6} />
       </mesh>

@@ -29,10 +29,10 @@ interface NoteParticleData {
   scale: number
 }
 
-const NOTE_PARTICLES: NoteParticleData[] = Array.from({ length: 10 }, (_, i) => ({
+const NOTE_PARTICLES: NoteParticleData[] = Array.from({ length: 6 }, (_, i) => ({
   id: i,
   symbol: PARTICLE_SYMBOLS[i % PARTICLE_SYMBOLS.length],
-  phaseOffset: i / 10,
+  phaseOffset: i / 6,
   speed: 0.28 + (i % 3) * 0.06,
   swayRadius: 0.032 + (i % 4) * 0.012,
   swayFreq: 2.2 + (i % 3) * 0.6,
@@ -42,7 +42,7 @@ const NOTE_PARTICLES: NoteParticleData[] = Array.from({ length: 10 }, (_, i) => 
 
 /**
  * Renders:
- * 1. Continuous 3D musical note particles rising from the music player when playing
+ * 1. Continuous 3D musical note particles rising from the music player ONLY when playing
  * 2. Active song lyric line floating in mid-air with white text and an electric yellow text outline/border
  */
 export function MusicAtmosphere({
@@ -108,7 +108,7 @@ export function MusicAtmosphere({
 
   // Determine the single currently active lyric line and its duration window based on currentTime
   const activeLyricInfo = useMemo(() => {
-    if (!lyrics || lyrics.length === 0) return null
+    if (!isPlaying || !lyrics || lyrics.length === 0) return null
     let idx = 0
     for (let i = 0; i < lyrics.length; i++) {
       if (currentTime >= lyrics[i].time) {
@@ -119,7 +119,6 @@ export function MusicAtmosphere({
     }
     const current = lyrics[idx]
     const next = lyrics[idx + 1]
-    // Duration for this lyric line to float up and fade out before the next line appears
     const windowDuration = next
       ? Math.max(1.2, Math.min(4.2, next.time - current.time))
       : 3.5
@@ -127,7 +126,7 @@ export function MusicAtmosphere({
       line: current,
       windowDuration,
     }
-  }, [lyrics, currentTime])
+  }, [isPlaying, lyrics, currentTime])
 
   // Animate floating musical notes and rising/fading song lyrics when playing
   useFrame((state) => {
@@ -140,7 +139,6 @@ export function MusicAtmosphere({
       const domEl = particleRefs.current[idx]
       if (!grp || !domEl) return
 
-      // Life cycle from 0 (turntable origin) to 1 (high in the air)
       const life = (t * p.speed + p.phaseOffset) % 1
       const y = 0.19 + life * 0.36
       const angle = t * p.swayFreq + p.id * 1.4
@@ -149,7 +147,6 @@ export function MusicAtmosphere({
 
       grp.position.set(x, y, z)
 
-      // Smooth fade-in at birth and fade-out at top
       const alpha =
         life < 0.18
           ? life / 0.18
@@ -162,8 +159,8 @@ export function MusicAtmosphere({
       domEl.style.transform = `scale(${scale.toFixed(2)}) rotate(${Math.sin(angle) * 16}deg)`
     })
 
-    // 2. Animate active lyric line rising in the air, gently swaying, and fading away like the note particles
-    if (lyricGroupRef.current && lyricDomRef.current && activeLyricInfo && isPlaying) {
+    // 2. Animate active lyric line rising in the air, gently swaying, and fading away
+    if (lyricGroupRef.current && lyricDomRef.current && activeLyricInfo) {
       if (lastLyricTimeRef.current !== activeLyricInfo.line.time) {
         lastLyricTimeRef.current = activeLyricInfo.line.time
         lyricSpawnClockRef.current = t
@@ -172,15 +169,12 @@ export function MusicAtmosphere({
       const elapsed = Math.max(0, t - lyricSpawnClockRef.current)
       const life = Math.min(1, elapsed / activeLyricInfo.windowDuration)
 
-      // Float upward from turntable height (y = 0.22) up into the air (y = 0.48)
       const y = 0.22 + life * 0.26
-      // Subtle gentle horizontal breeze sway
       const swayX = Math.sin(t * 2.0 + activeLyricInfo.line.time) * 0.018 * life
       const swayZ = Math.cos(t * 1.6 + activeLyricInfo.line.time) * 0.012 * life
 
       lyricGroupRef.current.position.set(swayX, y, swayZ)
 
-      // Smooth fade-in at birth (0 -> 0.18), full visibility in middle, and soft fade-away as it floats high (0.68 -> 1.0)
       const alpha =
         life < 0.18
           ? life / 0.18
@@ -197,6 +191,9 @@ export function MusicAtmosphere({
         life > 0.72 ? `blur(${((life - 0.72) * 6).toFixed(1)}px)` : 'none'
     }
   })
+
+  // Unmount all <Html> nodes when music is paused so zero DOM projection math runs during camera movement!
+  if (!isPlaying) return null
 
   return (
     <group name="MusicPlayerAtmosphere">
@@ -233,7 +230,7 @@ export function MusicAtmosphere({
       ))}
 
       {/* 2. Active Lyric Line Rising in Air and Fading Away Like the Music Particles */}
-      {isPlaying && activeLyricInfo && (
+      {activeLyricInfo && (
         <group ref={lyricGroupRef} position={[0, 0.22, 0]}>
           <Html
             center

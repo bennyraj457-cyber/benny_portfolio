@@ -9,13 +9,19 @@ export function StudioLoader({ onComplete, isReady = false }: StudioLoaderProps)
   const [progress, setProgress] = useState(15)
   const [statusText, setStatusText] = useState('Initializing 3D Room...')
   const [isFadingOut, setIsFadingOut] = useState(false)
+  const [forceReady, setForceReady] = useState(false)
 
   useEffect(() => {
+    // Safety timeout: never allow the loader to stay stuck on slow networks or blocked assets
+    const safetyTimer = setTimeout(() => {
+      setForceReady(true)
+    }, 2400)
+
     // Progress interval simulating resource setup
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev < 88) {
-          const next = prev + Math.max(1, Math.floor((90 - prev) * 0.18))
+        if (prev < 92) {
+          const next = prev + Math.max(2, Math.floor((94 - prev) * 0.22))
           if (next > 45 && next <= 75) {
             setStatusText('Building 3D Studio...')
           } else if (next > 75) {
@@ -25,32 +31,37 @@ export function StudioLoader({ onComplete, isReady = false }: StudioLoaderProps)
         }
         return prev
       })
-    }, 100)
+    }, 90)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(safetyTimer)
+      clearInterval(interval)
+    }
   }, [])
+
+  const effectiveReady = isReady || forceReady
 
   // When scene signals ready (or forced complete)
   useEffect(() => {
-    if (isReady) {
+    if (effectiveReady) {
       setProgress(100)
       setStatusText('Studio Ready')
       const timer = setTimeout(() => {
         setIsFadingOut(true)
         const completeTimer = setTimeout(() => {
           onComplete?.()
-        }, 500)
+        }, 400)
         return () => clearTimeout(completeTimer)
-      }, 200)
+      }, 140)
       return () => clearTimeout(timer)
     }
-  }, [isReady, onComplete])
+  }, [effectiveReady, onComplete])
 
   return (
     <div
       role="status"
       aria-label="Loading 3D Studio"
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_45%,#232421_0%,#141513_100%)] font-mono text-[#fbf9f3] transition-all duration-700 select-none ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_45%,#232421_0%,#141513_100%)] font-mono text-[#fbf9f3] transition-all duration-500 select-none ${
         isFadingOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
       }`}
     >

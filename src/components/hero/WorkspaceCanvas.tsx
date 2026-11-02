@@ -148,7 +148,7 @@ function SceneReadyNotifier({ onReady }: { onReady: () => void }) {
     if (signaledRef.current) return
     frameCountRef.current += 1
 
-    if (frameCountRef.current >= 3) {
+    if (frameCountRef.current >= 2) {
       signaledRef.current = true
       onReady()
     }
@@ -184,41 +184,40 @@ export function WorkspaceCanvas({ onBackToHome }: WorkspaceCanvasProps) {
         <RoomEntranceProvider>
           <WorkspaceFocusProvider>
             <StoryScrollProvider>
-          <div className="relative w-full h-full min-h-screen bg-[#f0eee8]">
-            {/* The Loader is now presented here after Enter Studio is clicked */}
-            {showLoader && (
-              <StudioLoader
-                isReady={isSceneReady}
-                onComplete={() => setShowLoader(false)}
-              />
-            )}
+              <div className="relative w-full h-full min-h-screen bg-[#f0eee8]">
+                {/* The Loader is presented here after Enter Studio is clicked */}
+                {showLoader && (
+                  <StudioLoader
+                    isReady={isSceneReady}
+                    onComplete={() => setShowLoader(false)}
+                  />
+                )}
 
-            <Suspense
-              fallback={<div className="w-full h-full min-h-screen bg-[#181917]" />}
-            >
-              <Canvas
-                shadows
-                dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.35)]}
-                gl={{
-                  antialias: true,
-                  powerPreference: 'high-performance',
-                  alpha: false,
-                  stencil: false,
-                  depth: true,
-                }}
-              >
-                <color attach="background" args={['#f0eee8']} />
-                <Camera />
-                <Lighting />
-                <Room />
-                <SceneReadyNotifier onReady={() => setIsSceneReady(true)} />
-              </Canvas>
-            </Suspense>
-            <EntranceOverlay />
-            <BackToWorkspaceControl onBackToHome={onBackToHome} />
-            <StoryScrollHUD />
-            <StoryScrollBridge />
-          </div>
+                <Canvas
+                  shadows
+                  dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25)]}
+                  performance={{ min: 0.5 }}
+                  gl={{
+                    antialias: true,
+                    powerPreference: 'high-performance',
+                    alpha: false,
+                    stencil: false,
+                    depth: true,
+                  }}
+                >
+                  <color attach="background" args={['#f0eee8']} />
+                  <Camera />
+                  <Lighting />
+                  <Suspense fallback={null}>
+                    <Room />
+                  </Suspense>
+                  <SceneReadyNotifier onReady={() => setIsSceneReady(true)} />
+                </Canvas>
+                <EntranceOverlay />
+                <BackToWorkspaceControl onBackToHome={onBackToHome} />
+                <StoryScrollHUD />
+                <StoryScrollBridge />
+              </div>
             </StoryScrollProvider>
           </WorkspaceFocusProvider>
         </RoomEntranceProvider>

@@ -66,8 +66,8 @@ function createNotebookCoverTexture(content: AboutMeContentConfig): THREE.Canvas
 
   // 2. Subtle organic bookcloth / fine pebble grain texture
   ctx.fillStyle = 'rgba(255, 255, 255, 0.018)'
-  for (let y = 0; y < height; y += 3) {
-    for (let x = 0; x < width; x += 3) {
+  for (let y = 0; y < height; y += 6) {
+    for (let x = 0; x < width; x += 6) {
       const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
       if (n - Math.floor(n) > 0.55) {
         ctx.fillRect(x, y, 2, 2)
@@ -123,23 +123,24 @@ function createNotebookCoverTexture(content: AboutMeContentConfig): THREE.Canvas
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
+  texture.anisotropy = 4
   texture.needsUpdate = true
   return texture
 }
 
 /**
- * Generates the LEFT inside page texture of the opened notebook
- * (mounted on the inside of the front cover, flipped horizontally when open).
+ * Generates the LEFT inside page texture of the opened notebook.
  * Displays the personal greeting, role title, and editorial bio quote.
  */
 function createLeftInsidePageTexture(content: AboutMeContentConfig): THREE.CanvasTexture {
   const width = 1024
   const height = 1400
+  const scale = 0.75
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
   const ctx = canvas.getContext('2d')!
+  ctx.scale(scale, scale)
 
   // 1. Warm archival paper base (#faf7f0)
   ctx.fillStyle = '#faf7f0'
@@ -155,7 +156,7 @@ function createLeftInsidePageTexture(content: AboutMeContentConfig): THREE.Canva
     ctx.stroke()
   }
 
-  // 3. Subtle spine shadow along the right edge (where left page meets center binding)
+  // 3. Subtle spine shadow along the right edge
   const spineGrad = ctx.createLinearGradient(width - 75, 0, width, 0)
   spineGrad.addColorStop(0, 'rgba(27, 28, 25, 0)')
   spineGrad.addColorStop(0.7, 'rgba(27, 28, 25, 0.08)')
@@ -235,7 +236,9 @@ function createLeftInsidePageTexture(content: AboutMeContentConfig): THREE.Canva
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 16
+  texture.anisotropy = 4
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
   texture.needsUpdate = true
   return texture
 }
@@ -247,10 +250,12 @@ function createLeftInsidePageTexture(content: AboutMeContentConfig): THREE.Canva
 function createRightInsidePageTexture(content: AboutMeContentConfig): THREE.CanvasTexture {
   const width = 1024
   const height = 1400
+  const scale = 0.75
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
   const ctx = canvas.getContext('2d')!
+  ctx.scale(scale, scale)
 
   // 1. Warm archival paper base (#faf7f0)
   ctx.fillStyle = '#faf7f0'
@@ -354,7 +359,9 @@ function createRightInsidePageTexture(content: AboutMeContentConfig): THREE.Canv
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 16
+  texture.anisotropy = 4
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
   texture.needsUpdate = true
   return texture
 }
@@ -363,8 +370,8 @@ function createRightInsidePageTexture(content: AboutMeContentConfig): THREE.Canv
  * Generates a fine horizontal paper-stack texture for the cream page block edges.
  */
 function createPageEdgesTexture(): THREE.CanvasTexture {
-  const width = 256
-  const height = 128
+  const width = 128
+  const height = 64
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -392,6 +399,21 @@ export function AboutMeNotebook({
   const { activeObject, isNotebookOpen, isAnyObjectOpen, openNotebook } = useWorkspaceFocus()
   const [isHovered, setIsHovered] = useState(false)
 
+  // Lazy-generate inside page textures only after the notebook is first opened
+  const [hasOpenedOnce, setHasOpenedOnce] = useState(false)
+  useEffect(() => {
+    if (isNotebookOpen && !hasOpenedOnce) {
+      setHasOpenedOnce(true)
+    }
+  }, [isNotebookOpen, hasOpenedOnce])
+
+  const prefersReducedMotion = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+
   const groupRef = useRef<THREE.Group>(null)
   const frontCoverPivotRef = useRef<THREE.Group>(null)
   const glowRingMaterialRef = useRef<THREE.MeshBasicMaterial>(null)
@@ -402,16 +424,22 @@ export function AboutMeNotebook({
   const openProgressRef = useRef(0)
 
   const coverTexture = useMemo(() => createNotebookCoverTexture(content), [content])
-  const leftPageTexture = useMemo(() => createLeftInsidePageTexture(content), [content])
-  const rightPageTexture = useMemo(() => createRightInsidePageTexture(content), [content])
+  const leftPageTexture = useMemo(
+    () => (hasOpenedOnce ? createLeftInsidePageTexture(content) : null),
+    [content, hasOpenedOnce],
+  )
+  const rightPageTexture = useMemo(
+    () => (hasOpenedOnce ? createRightInsidePageTexture(content) : null),
+    [content, hasOpenedOnce],
+  )
   const pageEdgeTexture = useMemo(() => createPageEdgesTexture(), [])
 
   // Clean up procedural GPU textures and cursor state on unmount
   useEffect(() => {
     return () => {
       coverTexture.dispose()
-      leftPageTexture.dispose()
-      rightPageTexture.dispose()
+      leftPageTexture?.dispose()
+      rightPageTexture?.dispose()
       pageEdgeTexture.dispose()
       document.body.style.cursor = 'auto'
     }
@@ -454,21 +482,25 @@ export function AboutMeNotebook({
 
   // Smoothly animate hover highlight, notebook rotation alignment, and hardcover opening
   useFrame((_, delta) => {
+    const hoverTarget = isHovered && !isNotebookOpen ? 1 : 0
+    const openTarget = isNotebookOpen ? 1 : 0
+
+    // Early-exit when both hover and open transitions have converged
+    if (
+      Math.abs(hoverProgressRef.current - hoverTarget) < 0.001 &&
+      Math.abs(openProgressRef.current - openTarget) < 0.001
+    ) {
+      return
+    }
+
     const dt = Math.min(delta, 0.1)
 
     // 1. Hover interpolation (suppressed when already open)
-    const hoverTarget = isHovered && !isNotebookOpen ? 1 : 0
     const hoverFactor = 1 - Math.exp(-10 * dt)
     hoverProgressRef.current += (hoverTarget - hoverProgressRef.current) * hoverFactor
     const hp = hoverProgressRef.current
 
     // 2. Notebook cover opening interpolation
-    // Reduced-motion check for instant or gentle opening
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    const openTarget = isNotebookOpen ? 1 : 0
     const openSpeed = prefersReducedMotion ? 16 : isNotebookOpen ? 3.2 : 4.8
     const openFactor = 1 - Math.exp(-openSpeed * dt)
     openProgressRef.current = THREE.MathUtils.lerp(
@@ -485,13 +517,10 @@ export function AboutMeNotebook({
       0,
       1,
     )
-    // Smoothstep curve for realistic hardcover hinge physics
     const smoothOpen = rawOpen * rawOpen * (3 - 2 * rawOpen)
 
     if (groupRef.current) {
-      // Subtle lift on hover; flat on desk when open
       groupRef.current.position.y = position[1] + hp * 0.0018
-      // Smoothly straighten the notebook's yaw angle from 0.22 rad to 0 rad when open so pages are square to the reader
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         rotation[1],
         0,
@@ -499,7 +528,6 @@ export function AboutMeNotebook({
       )
     }
 
-    // Rotate the front cover around its left spine hinge from 0 deg (closed) to -177 deg (open flat on desk)
     if (frontCoverPivotRef.current) {
       frontCoverPivotRef.current.rotation.z = smoothOpen * (Math.PI * 0.982)
     }
@@ -533,8 +561,8 @@ export function AboutMeNotebook({
       onClick={handleClick}
     >
       {/* Subtle Aureolin Hover Outline / Rim Highlight on the Desk Surface */}
-      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.132, 0.146, 48]} />
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <ringGeometry args={[0.132, 0.146, 36]} />
         <meshBasicMaterial
           ref={glowRingMaterialRef}
           color="#f5d000"
@@ -549,7 +577,8 @@ export function AboutMeNotebook({
         args={[width + 0.009, 0.002, length + 0.009]}
         position={[0, 0.0015, 0]}
         radius={0.005}
-        smoothness={3}
+        smoothness={2}
+        raycast={() => null}
       >
         <meshBasicMaterial
           color="#f5d000"
@@ -600,6 +629,7 @@ export function AboutMeNotebook({
         <planeGeometry args={[width - 0.011, length - 0.01]} />
         <meshStandardMaterial
           map={rightPageTexture}
+          color={rightPageTexture ? '#ffffff' : '#faf7f0'}
           roughness={0.78}
           metalness={0.02}
         />
@@ -610,7 +640,7 @@ export function AboutMeNotebook({
         args={[0.009, 0.021, length]}
         position={[-width / 2 + 0.0035, 0.0105, 0]}
         radius={0.004}
-        smoothness={3}
+        smoothness={2}
         castShadow
         receiveShadow
       >
@@ -618,12 +648,11 @@ export function AboutMeNotebook({
       </RoundedBox>
 
       {/* 4. Hinged Front Hardcover + Left Inside Page Spread */}
-      {/* Pivot is placed at the top-left spine hinge [-width / 2, 0.0185, 0] */}
       <group
         ref={frontCoverPivotRef}
         position={[-width / 2 + 0.002, 0.0185, 0]}
       >
-        {/* Top Black Hardcover Board (offset by +width / 2 from the left spine hinge) */}
+        {/* Top Black Hardcover Board */}
         <RoundedBox
           args={[width, 0.0034, length]}
           position={[width / 2 - 0.002, 0.0008, 0]}
@@ -643,7 +672,6 @@ export function AboutMeNotebook({
         </RoundedBox>
 
         {/* Left Inside Page Stack attached to the inner side of the front cover */}
-        {/* When the cover rotates +177 deg around Z, the bottom face (-Y) becomes the upward-facing Left Page! */}
         <mesh
           position={[width / 2 - 0.001, -0.0028, 0]}
           castShadow
@@ -667,13 +695,14 @@ export function AboutMeNotebook({
           <planeGeometry args={[width - 0.011, length - 0.01]} />
           <meshStandardMaterial
             map={leftPageTexture}
+            color={leftPageTexture ? '#ffffff' : '#faf7f0'}
             roughness={0.78}
             metalness={0.02}
           />
         </mesh>
       </group>
 
-      {/* 5. Signature Electric-Yellow (#f5d000) Woven Elastic Closure Strap (Tucked under back cover when open) */}
+      {/* 5. Signature Electric-Yellow (#f5d000) Woven Elastic Closure Strap */}
       <RoundedBox
         args={[0.011, isNotebookOpen ? 0.0155 : 0.0222, length + 0.002]}
         position={[width * 0.28, isNotebookOpen ? 0.008 : 0.0106, 0]}
@@ -696,6 +725,7 @@ export function AboutMeNotebook({
         position={[-width / 2 + 0.008, 0.0035, length / 2 + 0.014]}
         rotation={[0.06, 0.14, 0]}
         castShadow
+        raycast={() => null}
       >
         <boxGeometry args={[0.014, 0.0015, 0.032]} />
         <meshStandardMaterial
@@ -707,22 +737,22 @@ export function AboutMeNotebook({
       </mesh>
 
       {/* 7. Realistic Machined Black & Brushed Gold Pen Beside the Notebook */}
-      <group position={[width / 2 + 0.028, 0.0065, 0.008]} rotation={[0, -0.08, 0]}>
+      <group position={[width / 2 + 0.028, 0.0065, 0.008]} rotation={[0, -0.08, 0]} raycast={() => null}>
         {/* Main Matte Obsidian Barrel */}
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.0052, 0.0048, 0.142, 20]} />
+          <cylinderGeometry args={[0.0052, 0.0048, 0.142, 16]} />
           <meshStandardMaterial color="#1f201d" roughness={0.28} metalness={0.78} />
         </mesh>
 
         {/* Tapered Nose Cone (Front) */}
         <mesh position={[0, 0, 0.079]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.0048, 0.0012, 0.016, 16]} />
+          <cylinderGeometry args={[0.0048, 0.0012, 0.016, 12]} />
           <meshStandardMaterial color="#dcdad4" roughness={0.22} metalness={0.88} />
         </mesh>
 
         {/* Precision Aureolin Gold Accent Ring near Cap */}
         <mesh position={[0, 0, -0.022]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.0055, 0.0055, 0.004, 20]} />
+          <cylinderGeometry args={[0.0055, 0.0055, 0.004, 16]} />
           <meshStandardMaterial
             color="#f5d000"
             roughness={0.25}

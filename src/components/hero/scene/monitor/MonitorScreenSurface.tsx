@@ -1,10 +1,13 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useWorkspaceFocus } from '@/context/WorkspaceFocusContext'
+import { useRoomEntrance } from '@/context/RoomEntranceContext'
 
-const CANVAS_W = 1400
-const CANVAS_H = 566
+const CANVAS_W = 2100
+const CANVAS_H = 850
 const HALF_W = CANVAS_W / 2 // 1050
+const RENDER_SCALE = 0.5 // Renders onto a lightweight 1050x425 buffer (75% less VRAM bandwidth)
 
 const TYPED_SNIPPETS = [
   'className="btn-primary rounded-full px-6 py-2.5"',
@@ -104,6 +107,7 @@ function roundRect(
 
 function drawSplitWorkspace(ctx: CanvasRenderingContext2D, t: number) {
   ctx.save()
+  ctx.scale(RENDER_SCALE, RENDER_SCALE)
 
   // ============================================================================
   // LEFT 50% (0 .. 1050): VISUAL STUDIO CODE — DARK IDE
@@ -885,12 +889,14 @@ function drawSplitWorkspace(ctx: CanvasRenderingContext2D, t: number) {
 
 export function MonitorScreenSurface() {
   const { gl } = useThree()
+  const { isAnyObjectOpen } = useWorkspaceFocus()
+  const { stage } = useRoomEntrance()
   const lastDrawRef = useRef<number>(-1)
 
   const { canvas, ctx, texture } = useMemo(() => {
     const c = document.createElement('canvas')
-    c.width = CANVAS_W
-    c.height = CANVAS_H
+    c.width = Math.round(CANVAS_W * RENDER_SCALE)
+    c.height = Math.round(CANVAS_H * RENDER_SCALE)
     const context = c.getContext('2d')
 
     if (context) {
@@ -908,11 +914,13 @@ export function MonitorScreenSurface() {
     return { canvas: c, ctx: context, texture: tex }
   }, [gl])
 
-  // Redraw at ~12 FPS for smooth typing, blinking caret, and Figma cursor motion with minimal CPU load
+  // Only redraw when the user is actually inside the room overview (paused at entrance or when inspecting another object)
   useFrame(({ clock }) => {
     if (!ctx) return
+    if (stage !== 'WORKSPACE' || isAnyObjectOpen) return
+
     const t = clock.getElapsedTime()
-    if (t - lastDrawRef.current < 0.16) return
+    if (t - lastDrawRef.current < 0.35) return
     lastDrawRef.current = t
 
     drawSplitWorkspace(ctx, t)
@@ -922,10 +930,9 @@ export function MonitorScreenSurface() {
   void canvas
 
   return (
-    <mesh position={[0, 0, 0.0125]}>
+    <mesh position={[0, 0, 0.0125]} raycast={() => null}>
       <planeGeometry args={[0.84, 0.34]} />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
   )
 }
-

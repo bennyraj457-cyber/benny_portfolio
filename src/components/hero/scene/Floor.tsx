@@ -5,26 +5,24 @@ export function Floor() {
   // Subtle procedural grid/plank texture for realistic architectural flooring
   const floorMaterial = useMemo(() => {
     const canvas = document.createElement('canvas')
-    canvas.width = 512
-    canvas.height = 512
+    canvas.width = 256
+    canvas.height = 256
     const ctx = canvas.getContext('2d')
     if (ctx) {
-      // Base warm grey architectural stone/micro-cement (#eae8e2 / #e4e2dd)
       ctx.fillStyle = '#e4e2dd'
-      ctx.fillRect(0, 0, 512, 512)
+      ctx.fillRect(0, 0, 256, 256)
 
-      // Subtle architectural tile seams
       ctx.strokeStyle = '#dcdad4'
-      ctx.lineWidth = 2
-      for (let i = 0; i <= 512; i += 128) {
+      ctx.lineWidth = 1.5
+      for (let i = 0; i <= 256; i += 64) {
         ctx.beginPath()
         ctx.moveTo(i, 0)
-        ctx.lineTo(i, 512)
+        ctx.lineTo(i, 256)
         ctx.stroke()
 
         ctx.beginPath()
         ctx.moveTo(0, i)
-        ctx.lineTo(512, i)
+        ctx.lineTo(256, i)
         ctx.stroke()
       }
     }
@@ -42,7 +40,7 @@ export function Floor() {
   }, [])
 
   return (
-    <group name="Floor">
+    <group name="Floor" raycast={() => null}>
       {/* Main Architectural Floor */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
@@ -83,4 +81,3 @@ export function Floor() {
     </group>
   )
 }
-

@@ -74,15 +74,17 @@ function createFrontCoverTexture(content: BookSkillsContent): THREE.CanvasTextur
 }
 
 /**
- * Creates high-resolution procedural left inside page texture (1024x1400)
+ * Creates procedural left inside page texture (768x1050)
  */
 function createLeftInsidePageTexture(content: BookSkillsContent): THREE.CanvasTexture {
   const width = 1024
   const height = 1400
+  const scale = 0.75
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
   const ctx = canvas.getContext('2d')!
+  ctx.scale(scale, scale)
 
   // Warm archival paper
   ctx.fillStyle = '#faf8f2'
@@ -179,21 +181,25 @@ function createLeftInsidePageTexture(content: BookSkillsContent): THREE.CanvasTe
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
+  texture.anisotropy = 4
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
   texture.needsUpdate = true
   return texture
 }
 
 /**
- * Creates high-resolution procedural right inside page texture (1024x1400)
+ * Creates procedural right inside page texture (768x1050)
  */
 function createRightInsidePageTexture(content: BookSkillsContent): THREE.CanvasTexture {
   const width = 1024
   const height = 1400
+  const scale = 0.75
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
   const ctx = canvas.getContext('2d')!
+  ctx.scale(scale, scale)
 
   // Warm archival paper
   ctx.fillStyle = '#faf8f2'
@@ -266,14 +272,16 @@ function createRightInsidePageTexture(content: BookSkillsContent): THREE.CanvasT
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
+  texture.anisotropy = 4
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
   texture.needsUpdate = true
   return texture
 }
 
 function createPageEdgesTexture(): THREE.CanvasTexture {
-  const width = 256
-  const height = 128
+  const width = 128
+  const height = 64
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -302,35 +310,33 @@ export interface OpenBookDisplayProps {
 /**
  * 3D Open Book Spread using the exact same hinged hardcover opening mechanics
  * and physics as the About Me Notebook.
+ * Lazy-generates its high-res page textures only when a book is actually opened!
  */
 export function OpenBookDisplay({ bookId, isOpen }: OpenBookDisplayProps) {
   // Retain the last active bookId during close animation so closing in-and-out animates seamlessly
-  const currentBookIdRef = useRef<SkillBookId>('html')
+  const currentBookIdRef = useRef<SkillBookId | null>(null)
   if (bookId) {
     currentBookIdRef.current = bookId
   }
   const displayBookId = bookId || currentBookIdRef.current
 
-  const content = SKILLS_DATA[displayBookId]
-
   const groupRef = useRef<THREE.Group>(null)
   const frontCoverPivotRef = useRef<THREE.Group>(null)
   const openProgressRef = useRef(0)
 
-  const coverTexture = useMemo(() => createFrontCoverTexture(content), [content])
-  const leftPageTexture = useMemo(() => createLeftInsidePageTexture(content), [content])
-  const rightPageTexture = useMemo(() => createRightInsidePageTexture(content), [content])
-  const pageEdgeTexture = useMemo(() => createPageEdgesTexture(), [])
+  const content = displayBookId ? SKILLS_DATA[displayBookId] : null
+  const hasActivated = content !== null
+
+  const coverTexture = useMemo(() => (content ? createFrontCoverTexture(content) : null), [content])
+  const leftPageTexture = useMemo(() => (content ? createLeftInsidePageTexture(content) : null), [content])
+  const rightPageTexture = useMemo(() => (content ? createRightInsidePageTexture(content) : null), [content])
+  const pageEdgeTexture = useMemo(() => (hasActivated ? createPageEdgesTexture() : null), [hasActivated])
 
   // Find original shelf position & leaning rotation of this specific book
-  const slotSpec = BOOK_SHELF_LOCAL_SLOTS[displayBookId] || BOOK_SHELF_LOCAL_SLOTS['react']
+  const slotSpec = (displayBookId && BOOK_SHELF_LOCAL_SLOTS[displayBookId]) || BOOK_SHELF_LOCAL_SLOTS['react']
   const initialPos = slotSpec.pos
   const initialRot = slotSpec.rot
 
-  // Final reading position directly in front of the camera in the same shelf group coordinates
-  // Shelf group is at [-0.78, 1.75, -1.3] + [0, 0.012, 0.005] = [-0.78, 1.762, -1.295]
-  // Camera looks at world [-0.90, 1.83, -1.02]
-  // In local space: [-0.90 - (-0.78), 1.83 - 1.762, -1.02 - (-1.295)] = [-0.12, 0.068, 0.275]
   const targetPos = useMemo(() => new THREE.Vector3(-0.12, 0.068, 0.275), [])
 
   // Dimensions of the book
@@ -338,11 +344,16 @@ export function OpenBookDisplay({ bookId, isOpen }: OpenBookDisplayProps) {
   const length = 0.24
 
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.1)
-
-    // Smooth transition progress: 0 = on shelf, 1 = fully open in front of reader
-    // Uses smooth cinematic damping (speed 3.2 on open, 3.8 on close)
+    if (!content) return
     const openTarget = isOpen ? 1 : 0
+    if (Math.abs(openProgressRef.current - openTarget) < 0.001) {
+      if (!isOpen && groupRef.current) {
+        groupRef.current.visible = false
+      }
+      return
+    }
+
+    const dt = Math.min(delta, 0.1)
     const openSpeed = isOpen ? 3.2 : 3.8
     const openFactor = 1 - Math.exp(-openSpeed * dt)
     openProgressRef.current = THREE.MathUtils.lerp(
@@ -363,40 +374,30 @@ export function OpenBookDisplay({ bookId, isOpen }: OpenBookDisplayProps) {
       groupRef.current.visible = true
     }
 
-    // Smooth ease-in-out curve on flight and cover:
-    // Stage 1: Flight out of the shelf / back into the shelf (smoothstep)
     const flightT = THREE.MathUtils.clamp(rawT / 0.52, 0, 1)
     const smoothFlight = flightT * flightT * (3 - 2 * flightT)
 
-    // Stage 2: Cover opening / closing (smoothstep)
     const coverT = THREE.MathUtils.clamp((rawT - 0.28) / 0.72, 0, 1)
     const smoothCover = coverT * coverT * (3 - 2 * coverT)
 
     if (groupRef.current) {
-      // Smoothly interpolate position from the exact shelf slot to the front of the camera
       const currentX = THREE.MathUtils.lerp(initialPos[0], targetPos.x, smoothFlight)
       const currentY = THREE.MathUtils.lerp(initialPos[1], targetPos.y, smoothFlight)
       const currentZ = THREE.MathUtils.lerp(initialPos[2], targetPos.z, smoothFlight)
       groupRef.current.position.set(currentX, currentY, currentZ)
 
-      // In OpenSkillBook:
-      // When closed (smoothCover = 0):
-      // The spine is at [-width / 2, 0, 0], pages run along +X, book height is along Z.
-      // On the shelf, the spine must face +Z (outward to camera), pages must go into -Z, height along Y.
-      // That exact mapping is: rotX = -Math.PI / 2 (-90 deg), rotY = 0, rotZ = Math.PI / 2 (90 deg)
-      // When open for reading (smoothFlight = 1):
-      // rotX = 1.32 rad (tilted up toward camera), rotY = 0, rotZ = 0
       const currentRotX = THREE.MathUtils.lerp(-Math.PI / 2, 1.32, smoothFlight)
       const currentRotY = THREE.MathUtils.lerp(0, 0, smoothFlight)
       const currentRotZ = THREE.MathUtils.lerp(Math.PI / 2 + initialRot[2], 0, smoothFlight)
       groupRef.current.rotation.set(currentRotX, currentRotY, currentRotZ)
     }
 
-    // Front cover hinges open smoothly from 0 rad (closed) to 177 deg (open flat)
     if (frontCoverPivotRef.current) {
       frontCoverPivotRef.current.rotation.z = smoothCover * (Math.PI * 0.982)
     }
   })
+
+  if (!content) return null
 
   return (
     <group ref={groupRef} name="OpenSkillBook" visible={false}>
